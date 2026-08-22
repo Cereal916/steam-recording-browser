@@ -78,8 +78,8 @@
                 </Grid>
             </StackPanel>
 
-            <TextBlock Grid.Row="1"
-                       Text="v1.0.2"
+            <TextBlock x:Name="VersionText"
+                       Grid.Row="1"
                        Foreground="#6F7A8C"
                        FontSize="11"
                        HorizontalAlignment="Right"/>

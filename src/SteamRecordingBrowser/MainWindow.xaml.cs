@@ -58,6 +58,7 @@ public partial class MainWindow : Window
 
         ReportStartup(21, "Creating main window…");
         InitializeComponent();
+        VersionText.Text = $"v{AppInfo.Version}";
 
         ReportStartup(25, "Loading clip metadata…");
         _metadata.Load();
@@ -133,7 +134,7 @@ public partial class MainWindow : Window
         };
 
         AppLogger.Write("============================================================");
-        AppLogger.Write("Steam Recording Browser v1.0.2 starting.");
+        AppLogger.Write($"Steam Recording Browser v{AppInfo.Version} starting.");
         AppLogger.Write($".NET runtime: {System.Runtime.InteropServices.RuntimeInformation.FrameworkDescription}");
         AppLogger.Write("Runtime architecture: native C# WPF + bundled libVLC.");
     }

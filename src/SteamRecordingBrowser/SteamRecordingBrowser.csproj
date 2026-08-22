@@ -12,11 +12,8 @@
     <AssemblyName>Steam Recording Browser</AssemblyName>
     <RootNamespace>SteamRecordingBrowser</RootNamespace>
 
-    <Version>1.0.2</Version>
-    <AssemblyVersion>1.0.2.0</AssemblyVersion>
-    <FileVersion>1.0.2.0</FileVersion>
     <Product>Steam Recording Browser</Product>
-    <AssemblyTitle>Steam Recording Browser 1.0.2</AssemblyTitle>
+    <AssemblyTitle>Steam Recording Browser $(Version)</AssemblyTitle>
     <Description>Browse, organize, play, and export Steam Game Recordings.</Description>
 
     <!-- The app is published self-contained. Native libVLC + plugins are

@@ -1,5 +1,10 @@
 <Project>
   <PropertyGroup>
+    <!-- Single source of truth for the application release version. -->
+    <VersionPrefix>1.1.0</VersionPrefix>
+    <Version>$(VersionPrefix)</Version>
+    <AssemblyVersion>$(VersionPrefix).0</AssemblyVersion>
+    <FileVersion>$(VersionPrefix).0</FileVersion>
     <Nullable>enable</Nullable>
     <ImplicitUsings>enable</ImplicitUsings>
     <Deterministic>true</Deterministic>

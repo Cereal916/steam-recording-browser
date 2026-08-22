@@ -366,7 +366,8 @@
                     <ColumnDefinition Width="Auto"/>
                 </Grid.ColumnDefinitions>
                 <TextBlock x:Name="StatusText" Foreground="#98A2B3" VerticalAlignment="Center"/>
-                <TextBlock Grid.Column="1" Text="v1.0.2" Foreground="#667080" VerticalAlignment="Center"/>
+                <TextBlock x:Name="VersionText" Grid.Column="1"
+                           Foreground="#667080" VerticalAlignment="Center"/>
             </Grid>
         </Border>
     </Grid>

@@ -4,6 +4,27 @@ All notable changes to Steam Recording Browser are documented here.
 
 The project adopts semantic versioning beginning with **1.0.0**.
 
+## 1.1.0 - 2026-08-22
+
+### Added
+
+- Added a dedicated dark-themed Settings window for application preferences.
+- Added a first-run prompt offering to create a Windows desktop shortcut.
+- Added desktop shortcut creation and replacement controls to Settings, with
+  persisted prompt state, status detection, logging, and error handling.
+
+### Changed
+
+- Moved Steam Game Recording folder selection from the main window into
+  Settings. The recording library reloads automatically when the folder changes.
+- Moved metadata backup and import actions from the main toolbar into Settings.
+- Metadata imports now refresh the active recording list and tag filters after
+  completion.
+- Applied dark styling to application scrollbars and native Windows title bars,
+  including hover, drag, caption, border, and title-text states.
+- Simplified the main toolbar by consolidating preference and maintenance
+  actions under Settings.
+
 ## 1.0.2 - 2026-08-22
 
 ### Changed

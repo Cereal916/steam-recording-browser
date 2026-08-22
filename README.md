@@ -3,7 +3,7 @@
 Steam Recording Browser is a Windows desktop application for browsing,
 organizing, playing, and exporting clips created by Steam Game Recording.
 
-Current release: **1.0.2**
+See the [changelog](CHANGELOG.md) for the current release and version history.
 
 ## Features
 

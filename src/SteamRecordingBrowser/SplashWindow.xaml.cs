@@ -1,4 +1,5 @@
 using System.Windows;
+using SteamRecordingBrowser.Models;
 
 namespace SteamRecordingBrowser;
 
@@ -7,6 +8,7 @@ public partial class SplashWindow : Window
     public SplashWindow()
     {
         InitializeComponent();
+        VersionText.Text = $"v{AppInfo.Version}";
     }
 
     public void SetProgress(double percent, string status)
