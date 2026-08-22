@@ -48,6 +48,134 @@
                 </Setter.Value>
             </Setter>
         </Style>
+        <Style x:Key="DarkVolumeSlider" TargetType="Slider">
+            <Setter Property="Height" Value="24"/>
+            <Setter Property="Focusable" Value="True"/>
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="Slider">
+                        <Grid VerticalAlignment="Center">
+                            <Track x:Name="PART_Track">
+                                <Track.DecreaseRepeatButton>
+                                    <RepeatButton Command="Slider.DecreaseLarge">
+                                        <RepeatButton.Template>
+                                            <ControlTemplate TargetType="RepeatButton">
+                                                <Border Height="5"
+                                                        Background="#66C0F4"
+                                                        CornerRadius="3"/>
+                                            </ControlTemplate>
+                                        </RepeatButton.Template>
+                                    </RepeatButton>
+                                </Track.DecreaseRepeatButton>
+                                <Track.IncreaseRepeatButton>
+                                    <RepeatButton Command="Slider.IncreaseLarge">
+                                        <RepeatButton.Template>
+                                            <ControlTemplate TargetType="RepeatButton">
+                                                <Border Height="5"
+                                                        Background="#343C49"
+                                                        CornerRadius="3"/>
+                                            </ControlTemplate>
+                                        </RepeatButton.Template>
+                                    </RepeatButton>
+                                </Track.IncreaseRepeatButton>
+                                <Track.Thumb>
+                                    <Thumb Width="14" Height="14">
+                                        <Thumb.Template>
+                                            <ControlTemplate TargetType="Thumb">
+                                                <Ellipse x:Name="VolumeThumb"
+                                                         Fill="#F4F7FB"
+                                                         Stroke="#66C0F4"
+                                                         StrokeThickness="2"/>
+                                                <ControlTemplate.Triggers>
+                                                    <Trigger Property="IsMouseOver" Value="True">
+                                                        <Setter TargetName="VolumeThumb" Property="Fill" Value="#FFFFFF"/>
+                                                        <Setter TargetName="VolumeThumb" Property="Stroke" Value="#8DD4FF"/>
+                                                    </Trigger>
+                                                    <Trigger Property="IsDragging" Value="True">
+                                                        <Setter TargetName="VolumeThumb" Property="Fill" Value="#66C0F4"/>
+                                                    </Trigger>
+                                                </ControlTemplate.Triggers>
+                                            </ControlTemplate>
+                                        </Thumb.Template>
+                                    </Thumb>
+                                </Track.Thumb>
+                            </Track>
+                        </Grid>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+        </Style>
+        <Style x:Key="DarkTimelineSlider" TargetType="Slider">
+            <Setter Property="Height" Value="30"/>
+            <Setter Property="Focusable" Value="True"/>
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="Slider">
+                        <Grid VerticalAlignment="Center">
+                            <Border Height="12"
+                                    Background="#0B0E13"
+                                    BorderBrush="#2F3744"
+                                    BorderThickness="1"
+                                    CornerRadius="6"/>
+                            <Track x:Name="PART_Track" Margin="3,0">
+                                <Track.DecreaseRepeatButton>
+                                    <RepeatButton Command="Slider.DecreaseLarge">
+                                        <RepeatButton.Template>
+                                            <ControlTemplate TargetType="RepeatButton">
+                                                <Border Height="6"
+                                                        Background="#4FA9DD"
+                                                        CornerRadius="3"/>
+                                            </ControlTemplate>
+                                        </RepeatButton.Template>
+                                    </RepeatButton>
+                                </Track.DecreaseRepeatButton>
+                                <Track.IncreaseRepeatButton>
+                                    <RepeatButton Command="Slider.IncreaseLarge">
+                                        <RepeatButton.Template>
+                                            <ControlTemplate TargetType="RepeatButton">
+                                                <Border Height="6"
+                                                        Background="#252C37"
+                                                        CornerRadius="3"/>
+                                            </ControlTemplate>
+                                        </RepeatButton.Template>
+                                    </RepeatButton>
+                                </Track.IncreaseRepeatButton>
+                                <Track.Thumb>
+                                    <Thumb Width="12" Height="22">
+                                        <Thumb.Template>
+                                            <ControlTemplate TargetType="Thumb">
+                                                <Border x:Name="TimelineThumb"
+                                                        Background="#F4F7FB"
+                                                        BorderBrush="#66C0F4"
+                                                        BorderThickness="2"
+                                                        CornerRadius="6">
+                                                    <Border.Effect>
+                                                        <DropShadowEffect Color="#000000"
+                                                                          BlurRadius="5"
+                                                                          ShadowDepth="1"
+                                                                          Opacity="0.55"/>
+                                                    </Border.Effect>
+                                                </Border>
+                                                <ControlTemplate.Triggers>
+                                                    <Trigger Property="IsMouseOver" Value="True">
+                                                        <Setter TargetName="TimelineThumb" Property="Background" Value="#FFFFFF"/>
+                                                        <Setter TargetName="TimelineThumb" Property="BorderBrush" Value="#8DD4FF"/>
+                                                    </Trigger>
+                                                    <Trigger Property="IsDragging" Value="True">
+                                                        <Setter TargetName="TimelineThumb" Property="Background" Value="#66C0F4"/>
+                                                        <Setter TargetName="TimelineThumb" Property="BorderBrush" Value="#B8E5FF"/>
+                                                    </Trigger>
+                                                </ControlTemplate.Triggers>
+                                            </ControlTemplate>
+                                        </Thumb.Template>
+                                    </Thumb>
+                                </Track.Thumb>
+                            </Track>
+                        </Grid>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+        </Style>
     </Window.Resources>
     <Grid>
         <Grid.RowDefinitions>
@@ -72,12 +200,14 @@
                     <ColumnDefinition Width="Auto"/>
                     <ColumnDefinition Width="*"/>
                     <ColumnDefinition Width="Auto"/>
+                    <ColumnDefinition Width="Auto"/>
                 </Grid.ColumnDefinitions>
 
                 <Button x:Name="PlayPauseButton" Content="Pause" Width="82" Height="36" Margin="14,0"
                         Click="PlayPause_Click"/>
                 <Grid Grid.Column="1" Margin="8,0">
                     <Slider x:Name="Timeline"
+                            Style="{StaticResource DarkTimelineSlider}"
                             Minimum="0" Maximum="1"
                             SmallChange="0.01"
                             LargeChange="0.05"
@@ -125,6 +255,43 @@
                            Margin="14,0"
                            Foreground="#D5DBE5"
                            Text="0:00 / 0:00"/>
+                <Border Grid.Column="3"
+                        Margin="0,0,14,0"
+                        Padding="5,4,8,4"
+                        VerticalAlignment="Center"
+                        Background="#10141B"
+                        BorderBrush="#343C49"
+                        BorderThickness="1"
+                        CornerRadius="6">
+                    <StackPanel Orientation="Horizontal">
+                        <Button x:Name="MuteButton"
+                                Content="Mute"
+                                Width="58"
+                                Height="30"
+                                Padding="8,4"
+                                ToolTip="Mute or unmute audio"
+                                Click="MuteButton_Click"/>
+                        <Slider x:Name="VolumeSlider"
+                                Style="{StaticResource DarkVolumeSlider}"
+                                Width="96"
+                                Margin="10,0,7,0"
+                                Minimum="0"
+                                Maximum="100"
+                                Value="100"
+                                SmallChange="5"
+                                LargeChange="10"
+                                ToolTip="Volume"
+                                ValueChanged="VolumeSlider_ValueChanged"/>
+                        <TextBlock x:Name="VolumeValueText"
+                                   Width="38"
+                                   VerticalAlignment="Center"
+                                   TextAlignment="Right"
+                                   Foreground="#D5DBE5"
+                                   FontSize="12"
+                                   FontWeight="SemiBold"
+                                   Text="100%"/>
+                    </StackPanel>
+                </Border>
             </Grid>
 
             <Border Grid.Row="1" BorderBrush="#2B3240" BorderThickness="0,1,0,0">

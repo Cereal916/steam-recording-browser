@@ -18,6 +18,9 @@ public partial class PlayerWindow : Window
     private readonly RecordingItem _item;
     private readonly MediaPlayer _player;
     private readonly Media _media;
+    private int _lastAudibleVolume = 100;
+    private int _desiredVolume = 100;
+    private bool _desiredMuted;
     private readonly DispatcherTimer _timer;
     private bool _dragging;
     private long _displayTimeMs;
@@ -103,7 +106,11 @@ private readonly DispatcherTimer _hoverFramePauseTimer;
         ClipInfoText.Text = $"{item.GameName}  •  {item.DisplayTime}";
         UpdateFavoriteButton();
 
-        _player = new MediaPlayer(vlc.LibVlc);
+        _player = new MediaPlayer(vlc.LibVlc)
+        {
+            Mute = false,
+            Volume = 100
+        };
         VideoView.MediaPlayer = _player;
         _media = vlc.CreatePlaybackMedia(item.Path);
 
@@ -353,6 +360,9 @@ private readonly DispatcherTimer _hoverFramePauseTimer;
         {
             _mediaEnded = false;
 
+            if (!_scrubbing)
+                EnsureMainAudioEnabled();
+
             if (_scrubbing)
             {
                 var now = System.Diagnostics.Stopwatch.GetTimestamp();
@@ -391,6 +401,79 @@ private readonly DispatcherTimer _hoverFramePauseTimer;
             }
 
         }));
+    }
+
+    private void EnsureMainAudioEnabled()
+    {
+        try
+        {
+            // libVLC creates its audio output asynchronously. Apply the UI's
+            // state after playback starts so the initial 100% setting reaches
+            // the active output device rather than only the player wrapper.
+            _player.Volume = _desiredVolume;
+            _player.Mute = _desiredMuted || _desiredVolume <= 0;
+
+            if (_player.AudioTrack < 0)
+            {
+                var audioTrack = _player.AudioTrackDescription?
+                    .FirstOrDefault(track => track.Id >= 0);
+
+                if (audioTrack.HasValue)
+                    _player.SetAudioTrack(audioTrack.Value.Id);
+            }
+
+            AppLogger.Write(
+                $"Main player audio ready. tracks={_player.AudioTrackCount} " +
+                $"selected={_player.AudioTrack} volume={_player.Volume} muted={_player.Mute}");
+        }
+        catch (Exception ex)
+        {
+            AppLogger.WriteException("Could not initialize main-player audio", ex);
+        }
+    }
+
+    private void VolumeSlider_ValueChanged(object sender, RoutedPropertyChangedEventArgs<double> e)
+    {
+        if (!IsLoaded)
+            return;
+
+        var volume = (int)Math.Round(e.NewValue);
+        _desiredVolume = volume;
+        _player.Volume = volume;
+        VolumeValueText.Text = $"{volume}%";
+
+        if (volume > 0)
+        {
+            _lastAudibleVolume = volume;
+            _desiredMuted = false;
+            _player.Mute = false;
+            MuteButton.Content = "Mute";
+        }
+        else
+        {
+            _desiredMuted = true;
+            _player.Mute = true;
+            MuteButton.Content = "Unmute";
+        }
+    }
+
+    private void MuteButton_Click(object sender, RoutedEventArgs e)
+    {
+        if (_player.Mute || VolumeSlider.Value <= 0)
+        {
+            if (VolumeSlider.Value <= 0)
+                VolumeSlider.Value = _lastAudibleVolume;
+            else
+                _player.Mute = false;
+
+            _desiredMuted = false;
+            MuteButton.Content = "Mute";
+            return;
+        }
+
+        _desiredMuted = true;
+        _player.Mute = true;
+        MuteButton.Content = "Unmute";
     }
 
     private void Player_Paused(object? sender, EventArgs e)
