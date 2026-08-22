@@ -4,6 +4,22 @@ All notable changes to Steam Recording Browser are documented here.
 
 The project adopts semantic versioning beginning with **1.0.0**.
 
+## 1.1.2 - 2026-08-22
+
+### Fixed
+
+- Fixed full-player audio starting silently until the volume control was moved.
+- Explicitly selects an available audio track and synchronizes the configured
+  volume after libVLC initializes its audio output.
+- Updated the test project to use the repository's configured Microsoft Testing
+  Platform runner so .NET 10 release and CI test commands execute correctly.
+
+### Changed
+
+- Added mute and volume controls to the video player.
+- Added polished dark styling for the volume slider, playback timeline, and
+  seek cursor, including hover and drag feedback.
+
 ## 1.1.1 - 2026-08-22
 
 ### Fixed
