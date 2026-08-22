@@ -1,0 +1,153 @@
+using System.IO;
+using System.Windows;
+using SteamRecordingBrowser.Models;
+using SteamRecordingBrowser.Services;
+
+namespace SteamRecordingBrowser;
+
+public partial class SettingsWindow : Window
+{
+    private readonly SettingsService _settings = new();
+    private readonly MetadataService _metadata;
+    private readonly IReadOnlyCollection<RecordingItem> _recordings;
+
+    public bool RecordingRootChanged { get; private set; }
+    public bool MetadataImported { get; private set; }
+
+    public SettingsWindow(MetadataService metadata, IReadOnlyCollection<RecordingItem> recordings)
+    {
+        _metadata = metadata;
+        _recordings = recordings;
+        InitializeComponent();
+        RecordingRootBox.Text = _settings.Load().RecordingRoot;
+        UpdateShortcutStatus();
+    }
+
+    private void BackupMetadata_Click(object sender, RoutedEventArgs e)
+    {
+        var dialog = new Microsoft.Win32.SaveFileDialog
+        {
+            Title = "Back up Steam Recording Browser metadata",
+            Filter = "JSON metadata (*.json)|*.json",
+            FileName = $"SteamRecordingBrowser_metadata_{DateTime.Now:yyyyMMdd_HHmmss}.json"
+        };
+
+        if (dialog.ShowDialog(this) != true)
+            return;
+
+        try
+        {
+            _metadata.Backup(dialog.FileName);
+            MessageBox.Show(this, "Metadata backup created.", "Steam Recording Browser",
+                MessageBoxButton.OK, MessageBoxImage.Information);
+        }
+        catch (Exception ex)
+        {
+            AppLogger.WriteException("Metadata backup failed", ex);
+            MessageBox.Show(this, ex.Message, "Backup failed",
+                MessageBoxButton.OK, MessageBoxImage.Error);
+        }
+    }
+
+    private void ImportMetadata_Click(object sender, RoutedEventArgs e)
+    {
+        var dialog = new Microsoft.Win32.OpenFileDialog
+        {
+            Title = "Import Steam Recording Browser metadata",
+            Filter = "JSON metadata (*.json)|*.json"
+        };
+
+        if (dialog.ShowDialog(this) != true)
+            return;
+
+        if (MessageBox.Show(this,
+                "Importing will replace the current favorites, descriptions, and tags.\n\n" +
+                "A safety backup will be created first. Continue?",
+                "Import metadata",
+                MessageBoxButton.YesNo,
+                MessageBoxImage.Question) != MessageBoxResult.Yes)
+            return;
+
+        try
+        {
+            var result = _metadata.Import(dialog.FileName, _recordings);
+            MetadataImported = true;
+
+            var message = result.Matched == 0
+                ? $"The backup was read, but no current recordings matched.\n\nSafety backup:\n{result.SafetyBackup}"
+                : $"Matched clips: {result.Matched}\nFavorites: {result.Favorites}\n" +
+                  $"Descriptions: {result.Descriptions}\nTagged clips: {result.Tagged}";
+
+            MessageBox.Show(this, message, "Metadata import",
+                MessageBoxButton.OK,
+                result.Matched == 0 ? MessageBoxImage.Warning : MessageBoxImage.Information);
+        }
+        catch (Exception ex)
+        {
+            AppLogger.WriteException("Metadata import failed", ex);
+            MessageBox.Show(this, ex.Message, "Import failed",
+                MessageBoxButton.OK, MessageBoxImage.Error);
+        }
+    }
+
+    private void BrowseRecordingRoot_Click(object sender, RoutedEventArgs e)
+    {
+        var dialog = new Microsoft.Win32.OpenFolderDialog
+        {
+            Title = "Select the Steam Game Recording folder",
+            Multiselect = false
+        };
+
+        if (Directory.Exists(RecordingRootBox.Text))
+            dialog.InitialDirectory = RecordingRootBox.Text;
+
+        if (dialog.ShowDialog(this) != true)
+            return;
+
+        RecordingRootBox.Text = dialog.FolderName;
+        _settings.SaveRecordingRoot(dialog.FolderName);
+        RecordingRootChanged = true;
+    }
+
+    private void CreateShortcut_Click(object sender, RoutedEventArgs e)
+    {
+        try
+        {
+            DesktopShortcutService.Create();
+            UpdateShortcutStatus();
+
+            MessageBox.Show(
+                this,
+                "The desktop shortcut was created successfully.",
+                "Desktop shortcut",
+                MessageBoxButton.OK,
+                MessageBoxImage.Information);
+        }
+        catch (Exception ex)
+        {
+            AppLogger.WriteException("Desktop shortcut creation failed from settings", ex);
+            MessageBox.Show(
+                this,
+                $"The desktop shortcut could not be created.\n\n{ex.Message}",
+                "Shortcut creation failed",
+                MessageBoxButton.OK,
+                MessageBoxImage.Warning);
+        }
+    }
+
+    private void UpdateShortcutStatus()
+    {
+        if (DesktopShortcutService.Exists)
+        {
+            ShortcutStatusText.Text = "A shortcut already exists on your desktop.";
+            CreateShortcutButton.Content = "Replace shortcut";
+        }
+        else
+        {
+            ShortcutStatusText.Text = "Add a shortcut to your desktop for quick access.";
+            CreateShortcutButton.Content = "Create shortcut";
+        }
+    }
+
+    private void Close_Click(object sender, RoutedEventArgs e) => Close();
+}

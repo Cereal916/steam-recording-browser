@@ -36,6 +36,13 @@ public partial class MainWindow : Window
     private string _selectedGameId = "";
     private string _selectedTag = "";
     private string _sortMode = "Newest";
+    private string _recordingRoot = "";
+
+    private async void Settings_Click(object sender, RoutedEventArgs e)
+    {
+        if (ShowSettings() && Directory.Exists(_recordingRoot))
+            await LoadRecordingsAsync();
+    }
 
     // Clip-card previews intentionally share exactly one libVLC decoder.
     private readonly MediaPlayer _clipPreviewPlayer;
@@ -89,11 +96,16 @@ public partial class MainWindow : Window
             {
                 ReportStartup(41, "Preparing recording library…");
 
-                if (!Directory.Exists(RootBox.Text.Trim()) && !ChooseRecordingRoot())
+                if (!Directory.Exists(_recordingRoot))
                 {
-                    StatusText.Text = "Choose a Steam Game Recording folder to begin.";
-                    ReportStartup(100, "Ready — choose a recording folder.");
-                    return;
+                    ShowSettings();
+
+                    if (!Directory.Exists(_recordingRoot))
+                    {
+                        StatusText.Text = "Choose a Steam Game Recording folder in Settings to begin.";
+                        ReportStartup(100, "Ready — choose a recording folder in Settings.");
+                        return;
+                    }
                 }
 
                 await LoadRecordingsAsync(isInitialLoad: true);
@@ -133,7 +145,7 @@ public partial class MainWindow : Window
         _scanCancellation?.Cancel();
         _scanCancellation = new CancellationTokenSource();
 
-        var root = RootBox.Text.Trim();
+        var root = _recordingRoot;
 
         if (!Directory.Exists(root))
         {
@@ -763,70 +775,6 @@ public partial class MainWindow : Window
         ApplyFilter();
     }
 
-    private void Backup_Click(object sender, RoutedEventArgs e)
-    {
-        var dialog = new Microsoft.Win32.SaveFileDialog
-        {
-            Title = "Back up Steam Recording Browser metadata",
-            Filter = "JSON metadata (*.json)|*.json",
-            FileName = $"SteamRecordingBrowser_metadata_{DateTime.Now:yyyyMMdd_HHmmss}.json"
-        };
-
-        if (dialog.ShowDialog(this) != true) return;
-
-        try
-        {
-            _metadata.Backup(dialog.FileName);
-            WpfMessageBox.Show(this, "Metadata backup created.", "Steam Recording Browser",
-                WpfMessageBoxButton.OK, WpfMessageBoxImage.Information);
-        }
-        catch (Exception ex)
-        {
-            AppLogger.WriteException("Metadata backup failed", ex);
-            WpfMessageBox.Show(this, ex.Message, "Backup failed", WpfMessageBoxButton.OK, WpfMessageBoxImage.Error);
-        }
-    }
-
-    private void Import_Click(object sender, RoutedEventArgs e)
-    {
-        var dialog = new Microsoft.Win32.OpenFileDialog
-        {
-            Title = "Import Steam Recording Browser metadata",
-            Filter = "JSON metadata (*.json)|*.json"
-        };
-
-        if (dialog.ShowDialog(this) != true) return;
-
-        if (WpfMessageBox.Show(this,
-                "Importing will replace the current favorites, descriptions, and tags.\n\n" +
-                "A safety backup will be created first. Continue?",
-                "Import metadata",
-                WpfMessageBoxButton.YesNo,
-                WpfMessageBoxImage.Question) != MessageBoxResult.Yes)
-            return;
-
-        try
-        {
-            var result = _metadata.Import(dialog.FileName, _allItems);
-            UpdateTagFilter();
-            ApplyFilter();
-
-            var message = result.Matched == 0
-                ? $"The backup was read, but no current recordings matched.\n\nSafety backup:\n{result.SafetyBackup}"
-                : $"Matched clips: {result.Matched}\nFavorites: {result.Favorites}\n" +
-                  $"Descriptions: {result.Descriptions}\nTagged clips: {result.Tagged}";
-
-            WpfMessageBox.Show(this, message, "Metadata import",
-                WpfMessageBoxButton.OK,
-                result.Matched == 0 ? WpfMessageBoxImage.Warning : WpfMessageBoxImage.Information);
-        }
-        catch (Exception ex)
-        {
-            AppLogger.WriteException("Metadata import failed", ex);
-            WpfMessageBox.Show(this, ex.Message, "Import failed", WpfMessageBoxButton.OK, WpfMessageBoxImage.Error);
-        }
-    }
-
     private void OpenLog_Click(object sender, RoutedEventArgs e)
     {
         if (!File.Exists(AppLogger.LogPath))
@@ -841,7 +789,7 @@ public partial class MainWindow : Window
 
         if (Directory.Exists(saved))
         {
-            RootBox.Text = saved;
+            _recordingRoot = saved;
             AppLogger.Write($"Using saved recording root: {saved}");
             return;
         }
@@ -852,40 +800,34 @@ public partial class MainWindow : Window
         var discovered = _steam.FindDefaultRecordingRoot();
         if (Directory.Exists(discovered))
         {
-            RootBox.Text = discovered;
+            _recordingRoot = discovered;
             _settings.SaveRecordingRoot(discovered);
             return;
         }
 
-        RootBox.Text = "";
+        _recordingRoot = "";
         AppLogger.Write(
             "No Steam Game Recording folder was auto-detected; user selection is required.",
             "WARN");
     }
 
-    private bool ChooseRecordingRoot()
+    private bool ShowSettings()
     {
-        var dialog = new Microsoft.Win32.OpenFolderDialog
+        var dialog = new SettingsWindow(_metadata, _allItems)
         {
-            Title = "Select the Steam Game Recording folder",
-            Multiselect = false
+            Owner = this
         };
 
-        if (Directory.Exists(RootBox.Text))
-            dialog.InitialDirectory = RootBox.Text;
+        dialog.ShowDialog();
+        _recordingRoot = _settings.Load().RecordingRoot?.Trim() ?? "";
 
-        if (dialog.ShowDialog(this) != true)
-            return false;
+        if (dialog.MetadataImported)
+        {
+            UpdateTagFilter();
+            ApplyFilter();
+        }
 
-        RootBox.Text = dialog.FolderName;
-        _settings.SaveRecordingRoot(dialog.FolderName);
-        return true;
-    }
-
-    private async void BrowseRoot_Click(object sender, RoutedEventArgs e)
-    {
-        if (ChooseRecordingRoot())
-            await LoadRecordingsAsync();
+        return dialog.RecordingRootChanged;
     }
 
     private sealed record GameFilterItem(string Id, string Name);

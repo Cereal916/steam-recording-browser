@@ -176,9 +176,8 @@
                     </StackPanel>
 
                     <StackPanel DockPanel.Dock="Right" Orientation="Horizontal" VerticalAlignment="Center">
-                        <Button Style="{StaticResource ButtonStyle}" Content="Backup metadata" Click="Backup_Click"/>
-                        <Button Style="{StaticResource ButtonStyle}" Content="Import metadata" Click="Import_Click"/>
                         <Button Style="{StaticResource ButtonStyle}" Content="Open log" Click="OpenLog_Click"/>
+                        <Button Style="{StaticResource ButtonStyle}" Content="Settings" Click="Settings_Click"/>
                         <Button Style="{StaticResource ButtonStyle}" Content="Refresh" Click="Refresh_Click"/>
                     </StackPanel>
                 </DockPanel>
@@ -223,23 +222,13 @@
                               Checked="FavoritesOnly_Changed" Unchecked="FavoritesOnly_Changed"/>
                 </Grid>
 
-                <Grid Margin="0,10,0,0">
-                    <Grid.ColumnDefinitions>
-                        <ColumnDefinition Width="*"/>
-                        <ColumnDefinition Width="Auto"/>
-                    </Grid.ColumnDefinitions>
-
-                    <StackPanel Orientation="Horizontal">
-                        <TextBlock Text="Recording folder:" Foreground="{StaticResource Muted}" VerticalAlignment="Center"/>
-                        <TextBox x:Name="RootBox" Width="430" Margin="8,0" ToolTip="Steam Game Recording folder"/>
-                        <Button Style="{StaticResource ButtonStyle}" Content="Browse…" Click="BrowseRoot_Click"/>
-                    </StackPanel>
-
-                    <StackPanel x:Name="FilterStatusPanel" Grid.Column="1" Orientation="Horizontal" Visibility="Collapsed">
+                <DockPanel Margin="0,10,0,0" LastChildFill="False">
+                    <StackPanel x:Name="FilterStatusPanel" DockPanel.Dock="Right"
+                                Orientation="Horizontal" Visibility="Collapsed">
                         <TextBlock x:Name="FilterStatusText" Foreground="{StaticResource Muted}" VerticalAlignment="Center" Margin="0,0,10,0"/>
                         <Button Style="{StaticResource ButtonStyle}" Content="Clear all filters" Click="ClearFilters_Click"/>
                     </StackPanel>
-                </Grid>
+                </DockPanel>
 
                 <ProgressBar x:Name="LoadProgress" Height="4" Margin="0,12,0,0" Visibility="Collapsed"/>
             </StackPanel>

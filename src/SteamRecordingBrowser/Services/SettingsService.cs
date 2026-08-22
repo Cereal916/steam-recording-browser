@@ -38,12 +38,25 @@ public sealed class SettingsService
 
     public void SaveRecordingRoot(string root)
     {
+        var settings = Load();
+        settings.RecordingRoot = root.Trim();
+        Save(settings);
+
+        AppLogger.Write($"Saved recording root: {settings.RecordingRoot}");
+    }
+
+    public void MarkDesktopShortcutPromptShown()
+    {
+        var settings = Load();
+        settings.DesktopShortcutPromptShown = true;
+        Save(settings);
+    }
+
+    private static void Save(AppSettings settings)
+    {
         try
         {
             Directory.CreateDirectory(SettingsDirectory);
-
-            var settings = Load();
-            settings.RecordingRoot = root.Trim();
 
             var tempPath = SettingsPath + ".tmp";
             File.WriteAllText(
@@ -51,8 +64,6 @@ public sealed class SettingsService
                 JsonSerializer.Serialize(settings, JsonOptions));
 
             File.Move(tempPath, SettingsPath, overwrite: true);
-
-            AppLogger.Write($"Saved recording root: {settings.RecordingRoot}");
         }
         catch (Exception ex)
         {
@@ -64,4 +75,5 @@ public sealed class SettingsService
 public sealed class AppSettings
 {
     public string RecordingRoot { get; set; } = "";
+    public bool DesktopShortcutPromptShown { get; set; }
 }

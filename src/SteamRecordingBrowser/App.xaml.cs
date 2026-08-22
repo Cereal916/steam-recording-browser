@@ -80,6 +80,7 @@ public partial class App : Application
                                     closeTimer.Stop();
                                     splash.Close();
                                     main.Activate();
+                                    OfferDesktopShortcut(main);
                                 };
 
                                 closeTimer.Start();
@@ -118,5 +119,40 @@ public partial class App : Application
                     Shutdown(-1);
                 }
             }));
+    }
+
+    private static void OfferDesktopShortcut(Window owner)
+    {
+        var settingsService = new SettingsService();
+        if (settingsService.Load().DesktopShortcutPromptShown)
+            return;
+
+        var result = MessageBox.Show(
+            owner,
+            "Would you like to create a desktop shortcut for Steam Recording Browser?",
+            "Create desktop shortcut",
+            MessageBoxButton.YesNo,
+            MessageBoxImage.Question);
+
+        // Remember either answer so the question is only shown on first run.
+        settingsService.MarkDesktopShortcutPromptShown();
+
+        if (result != MessageBoxResult.Yes)
+            return;
+
+        try
+        {
+            DesktopShortcutService.Create();
+        }
+        catch (Exception ex)
+        {
+            AppLogger.WriteException("Desktop shortcut creation failed", ex);
+            MessageBox.Show(
+                owner,
+                $"The desktop shortcut could not be created.\n\n{ex.Message}",
+                "Shortcut creation failed",
+                MessageBoxButton.OK,
+                MessageBoxImage.Warning);
+        }
     }
 }
