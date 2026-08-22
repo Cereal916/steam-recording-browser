@@ -151,8 +151,3 @@ so production releases intentionally remain a portable folder/ZIP rather than
 forcing the application into a single executable.
 
 Keep all files in the published folder together.
-
-## License
-
-No repository license is added automatically. Add the license you want before
-publishing the repository for third-party reuse.
