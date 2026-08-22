@@ -1,0 +1,31 @@
+# .NET build output
+**/bin/
+**/obj/
+artifacts/
+publish/
+*.zip
+
+# Visual Studio
+.vs/
+*.user
+*.suo
+
+# JetBrains Rider
+.idea/
+*.sln.iml
+
+# VS Code/local editor state
+.vscode/
+
+# Runtime-generated files
+SteamRecordingBrowser.log
+*.log
+
+# Test output
+TestResults/
+coverage/
+coverage.*
+
+# OS noise
+Thumbs.db
+.DS_Store

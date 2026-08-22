@@ -1,0 +1,88 @@
+<Window x:Class="SteamRecordingBrowser.SplashWindow"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        Title="Steam Recording Browser"
+        Width="560"
+        Height="300"
+        WindowStyle="None"
+        ResizeMode="NoResize"
+        WindowStartupLocation="CenterScreen"
+        ShowInTaskbar="False"
+        Topmost="True"
+        Background="Transparent"
+        AllowsTransparency="True">
+    <Border Background="#0D1117"
+            BorderBrush="#2E3746"
+            BorderThickness="1"
+            CornerRadius="12"
+            Padding="26">
+        <Grid>
+            <Grid.RowDefinitions>
+                <RowDefinition Height="*"/>
+                <RowDefinition Height="Auto"/>
+            </Grid.RowDefinitions>
+
+            <StackPanel VerticalAlignment="Center"
+                        HorizontalAlignment="Center">
+                <Image Source="Assets/SteamRecordingBrowser_Logo.png"
+                       Width="360"
+                       Height="118"
+                       Stretch="Uniform"
+                       Margin="0,0,0,20"/>
+
+                <TextBlock Text="Loading Steam Recording Browser…"
+                           Foreground="#F4F7FB"
+                           FontSize="18"
+                           FontWeight="SemiBold"
+                           HorizontalAlignment="Center"
+                           Margin="0,0,0,14"/>
+
+                <Grid Width="360">
+                    <Grid.RowDefinitions>
+                        <RowDefinition Height="Auto"/>
+                        <RowDefinition Height="Auto"/>
+                    </Grid.RowDefinitions>
+
+                    <ProgressBar x:Name="StartupProgressBar"
+                                 Grid.Row="0"
+                                 Width="360"
+                                 Height="12"
+                                 Minimum="0"
+                                 Maximum="100"
+                                 Value="0"
+                                 IsIndeterminate="False"
+                                 Background="#1A202A"
+                                 Foreground="#7AA2F7"/>
+
+                    <Grid Grid.Row="1" Margin="0,10,0,0">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="*"/>
+                            <ColumnDefinition Width="Auto"/>
+                        </Grid.ColumnDefinitions>
+
+                        <TextBlock x:Name="StatusText"
+                                   Grid.Column="0"
+                                   Text="Starting…"
+                                   Foreground="#98A2B3"
+                                   FontSize="12"
+                                   TextTrimming="CharacterEllipsis"/>
+
+                        <TextBlock x:Name="PercentText"
+                                   Grid.Column="1"
+                                   Text="0%"
+                                   Foreground="#D5DBE5"
+                                   FontSize="12"
+                                   FontWeight="SemiBold"
+                                   Margin="12,0,0,0"/>
+                    </Grid>
+                </Grid>
+            </StackPanel>
+
+            <TextBlock Grid.Row="1"
+                       Text="v1.0.2"
+                       Foreground="#6F7A8C"
+                       FontSize="11"
+                       HorizontalAlignment="Right"/>
+        </Grid>
+    </Border>
+</Window>

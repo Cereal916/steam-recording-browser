@@ -1,0 +1,41 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <OutputType>WinExe</OutputType>
+    <TargetFramework>net10.0-windows</TargetFramework>
+    <UseWPF>true</UseWPF>
+    <EnableWindowsTargeting>true</EnableWindowsTargeting>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <ApplicationIcon>Assets\SteamRecordingBrowser.ico</ApplicationIcon>
+    <ApplicationManifest>app.manifest</ApplicationManifest>
+    <AssemblyName>Steam Recording Browser</AssemblyName>
+    <RootNamespace>SteamRecordingBrowser</RootNamespace>
+
+    <Version>1.0.2</Version>
+    <AssemblyVersion>1.0.2.0</AssemblyVersion>
+    <FileVersion>1.0.2.0</FileVersion>
+    <Product>Steam Recording Browser</Product>
+    <AssemblyTitle>Steam Recording Browser 1.0.2</AssemblyTitle>
+    <Description>Browse, organize, play, and export Steam Game Recordings.</Description>
+
+    <!-- The app is published self-contained. Native libVLC + plugins are
+         deliberately preserved as real files rather than forced into a
+         single-file host. -->
+    <SelfContained>true</SelfContained>
+    <RuntimeIdentifier>win-x64</RuntimeIdentifier>
+    <PublishSingleFile>false</PublishSingleFile>
+    <PublishTrimmed>false</PublishTrimmed>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <PackageReference Include="LibVLCSharp.WPF" />
+    <PackageReference Include="VideoLAN.LibVLC.Windows" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <Resource Include="Assets\SteamRecordingBrowser_Logo.png" />
+    <Resource Include="Assets\SteamRecordingBrowser.ico" />
+  </ItemGroup>
+
+</Project>

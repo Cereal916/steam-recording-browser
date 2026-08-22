@@ -1,0 +1,67 @@
+using System.IO;
+using System.Text.Json;
+
+namespace SteamRecordingBrowser.Services;
+
+public sealed class SettingsService
+{
+    private static readonly JsonSerializerOptions JsonOptions = new()
+    {
+        WriteIndented = true
+    };
+
+    public static string SettingsDirectory =>
+        Path.Combine(
+            Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),
+            "SteamRecordingBrowser");
+
+    public static string SettingsPath =>
+        Path.Combine(SettingsDirectory, "settings.json");
+
+    public AppSettings Load()
+    {
+        try
+        {
+            if (!File.Exists(SettingsPath))
+                return new AppSettings();
+
+            var json = File.ReadAllText(SettingsPath);
+            return JsonSerializer.Deserialize<AppSettings>(json, JsonOptions)
+                   ?? new AppSettings();
+        }
+        catch (Exception ex)
+        {
+            AppLogger.WriteException("Settings load failed", ex);
+            return new AppSettings();
+        }
+    }
+
+    public void SaveRecordingRoot(string root)
+    {
+        try
+        {
+            Directory.CreateDirectory(SettingsDirectory);
+
+            var settings = Load();
+            settings.RecordingRoot = root.Trim();
+
+            var tempPath = SettingsPath + ".tmp";
+            File.WriteAllText(
+                tempPath,
+                JsonSerializer.Serialize(settings, JsonOptions));
+
+            File.Move(tempPath, SettingsPath, overwrite: true);
+
+            AppLogger.Write($"Saved recording root: {settings.RecordingRoot}");
+        }
+        catch (Exception ex)
+        {
+            AppLogger.WriteException("Settings save failed", ex);
+        }
+    }
+}
+
+public sealed class AppSettings
+{
+    public string RecordingRoot { get; set; } = "";
+}
