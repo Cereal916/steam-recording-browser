@@ -31,4 +31,4 @@ jobs:
         run: dotnet build SteamRecordingBrowser.sln --configuration Release --no-restore
 
       - name: Test
-        run: dotnet test tests/SteamRecordingBrowser.Tests/SteamRecordingBrowser.Tests.csproj --configuration Release --no-build
+        run: dotnet test --project tests/SteamRecordingBrowser.Tests/SteamRecordingBrowser.Tests.csproj --configuration Release --no-build
