@@ -11,6 +11,12 @@ public partial class App : Application
     {
         base.OnStartup(e);
 
+        EventManager.RegisterClassHandler(
+            typeof(Window),
+            FrameworkElement.LoadedEvent,
+            new RoutedEventHandler((sender, _) =>
+                WindowThemeService.ApplyDarkTitleBar((Window)sender)));
+
         var splash = new SplashWindow();
         splash.SetProgress(2, "Starting application…");
         splash.Show();
