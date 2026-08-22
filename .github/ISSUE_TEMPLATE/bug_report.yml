@@ -1,0 +1,50 @@
+name: Bug report
+description: Report reproducible incorrect behavior
+title: "[Bug]: "
+labels: ["bug"]
+body:
+  - type: markdown
+    attributes:
+      value: Thanks for helping improve Steam Recording Browser. Remove personal paths or recording details before submitting logs.
+  - type: input
+    id: version
+    attributes:
+      label: Application version
+      placeholder: e.g. 1.1.1
+    validations:
+      required: true
+  - type: input
+    id: windows
+    attributes:
+      label: Windows version
+      placeholder: e.g. Windows 11 24H2
+    validations:
+      required: true
+  - type: textarea
+    id: description
+    attributes:
+      label: What happened?
+      description: Describe the observed and expected behavior.
+    validations:
+      required: true
+  - type: textarea
+    id: reproduction
+    attributes:
+      label: Reproduction steps
+    validations:
+      required: true
+  - type: textarea
+    id: logs
+    attributes:
+      label: Relevant logs
+      description: Paste only relevant, reviewed excerpts. Remove personal information and local paths.
+      render: text
+  - type: checkboxes
+    id: checklist
+    attributes:
+      label: Checklist
+      options:
+        - label: I searched existing issues for this problem.
+          required: true
+        - label: I removed personal or sensitive information from anything attached.
+          required: true

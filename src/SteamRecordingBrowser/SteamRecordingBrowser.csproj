@@ -19,7 +19,6 @@
     <!-- The app is published self-contained. Native libVLC + plugins are
          deliberately preserved as real files rather than forced into a
          single-file host. -->
-    <SelfContained>true</SelfContained>
     <RuntimeIdentifier>win-x64</RuntimeIdentifier>
     <PublishSingleFile>false</PublishSingleFile>
     <PublishTrimmed>false</PublishTrimmed>

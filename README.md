@@ -5,6 +5,27 @@ organizing, playing, and exporting clips created by Steam Game Recording.
 
 See the [changelog](CHANGELOG.md) for the current release and version history.
 
+![Steam Recording Browser library](https://github.com/user-attachments/assets/6866bbac-4ec6-472a-b578-8783e908626a)
+
+## Download and install
+
+Steam Recording Browser supports 64-bit Windows 10 and Windows 11.
+
+1. Download the latest `SteamRecordingBrowser-*-win-x64.zip` from
+   [GitHub Releases](https://github.com/Cereal916/steam-recording-browser/releases/latest).
+2. Optionally verify the ZIP using the accompanying `.sha256` file.
+3. Extract the complete ZIP to a folder you control.
+4. Run `Steam Recording Browser.exe`. Keep the extracted files together because
+   libVLC loads its native libraries and plugins from this folder.
+
+Releases are not currently code-signed. Windows may display an **Unknown
+publisher** or Microsoft Defender SmartScreen warning. Only download releases
+from this repository, and verify the published checksum when possible.
+
+On first launch, the app automatically looks for Steam Game Recordings. If it
+cannot find them, open **Settings**, select **Recording folder**, and choose the
+folder containing your Steam recording sessions.
+
 ## Features
 
 - Recursively discovers Steam Game Recording `session.mpd` files
@@ -124,6 +145,21 @@ Application settings:
 
 Runtime data is intentionally stored outside the repository.
 
+## Troubleshooting
+
+- **No recordings appear:** confirm the recording folder in **Settings**, then
+  select **Refresh**.
+- **Playback fails:** keep every file from the release ZIP together and confirm
+  the `libvlc` directory is still present.
+- **Windows blocks startup:** confirm the ZIP came from this repository and
+  verify its SHA-256 checksum before allowing the unsigned application.
+- **Need diagnostic information:** use **Open log** in the main window. When
+  filing a bug, remove any paths or other personal information you do not want
+  to share.
+
+For unresolved problems, open a
+[bug report](https://github.com/Cereal916/steam-recording-browser/issues/new/choose).
+
 ## Documentation
 
 - [Architecture](docs/architecture.md)
@@ -131,6 +167,7 @@ Runtime data is intentionally stored outside the repository.
 - [Development guide](docs/development.md)
 - [Changelog](CHANGELOG.md)
 - [Contributing](CONTRIBUTING.md)
+- [Support](SUPPORT.md)
 - [Security policy](SECURITY.md)
 
 ## Versioning
@@ -153,4 +190,7 @@ forcing the application into a single executable.
 Keep all files in the published folder together.
 
 ## License
+
 Steam Recording Browser is available under the [MIT License](LICENSE).
+Bundled dependencies retain their own licenses; see
+[Third-Party Notices](THIRD-PARTY-NOTICES.md).

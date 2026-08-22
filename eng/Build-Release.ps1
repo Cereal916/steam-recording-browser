@@ -7,6 +7,8 @@ $BuildRoot = $PSScriptRoot
 $RepoRoot = Split-Path -Parent $BuildRoot
 $Project = Join-Path $RepoRoot 'src\SteamRecordingBrowser\SteamRecordingBrowser.csproj'
 $BuildProps = Join-Path $RepoRoot 'Directory.Build.props'
+$License = Join-Path $RepoRoot 'LICENSE'
+$ThirdPartyNotices = Join-Path $RepoRoot 'THIRD-PARTY-NOTICES.md'
 $PublishRoot = Join-Path $RepoRoot 'artifacts\publish'
 
 [xml]$BuildPropsXml = Get-Content -Path $BuildProps -Raw
@@ -84,7 +86,16 @@ if (-not $plugins) {
     Write-Warning 'A libVLC plugins folder was not found in the publish output.'
 }
 
+Copy-Item -LiteralPath $License -Destination $AppFolder
+Copy-Item -LiteralPath $ThirdPartyNotices -Destination $AppFolder
+
 Compress-Archive -Path (Join-Path $AppFolder '*') -DestinationPath $ZipPath -CompressionLevel Optimal
+
+$checksum = (Get-FileHash -LiteralPath $ZipPath -Algorithm SHA256).Hash.ToLowerInvariant()
+$checksumPath = "$ZipPath.sha256"
+Set-Content -LiteralPath $checksumPath `
+    -Value "$checksum  $(Split-Path -Leaf $ZipPath)" `
+    -Encoding utf8NoBOM
 
 Write-Host ''
 Write-Host 'Build complete.' -ForegroundColor Green
@@ -93,6 +104,8 @@ Write-Host "  $AppFolder"
 Write-Host ''
 Write-Host "Portable ZIP:"
 Write-Host "  $ZipPath"
+Write-Host "SHA-256 checksum:"
+Write-Host "  $checksumPath"
 Write-Host ''
 Write-Host 'The published app requires no separate .NET, PowerShell, or VLC installation.'
 Write-Host 'Keep the published files together; libVLC uses native DLLs and plugins from the app folder.'

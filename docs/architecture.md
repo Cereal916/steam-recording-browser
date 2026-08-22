@@ -2,7 +2,7 @@
 
 ## Status
 
-This document describes the production architecture for Steam Recording Browser 1.0.0.
+This document describes the current production architecture for Steam Recording Browser.
 
 
 ## Decision

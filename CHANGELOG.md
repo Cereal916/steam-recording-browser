@@ -4,6 +4,21 @@ All notable changes to Steam Recording Browser are documented here.
 
 The project adopts semantic versioning beginning with **1.0.0**.
 
+## 1.1.1 - 2026-08-22
+
+### Fixed
+
+- Fixed CI builds by keeping normal application builds framework-dependent and
+  reserving self-contained output for the release publish step.
+- Updated GitHub Actions to Node 24-compatible releases.
+
+### Changed
+
+- Added release-package license and third-party notices.
+- Added SHA-256 checksum generation for portable release ZIPs.
+- Expanded installation, troubleshooting, contribution, and security guidance.
+- Added issue templates, dependency update automation, and CodeQL analysis.
+
 ## 1.1.0 - 2026-08-22
 
 ### Added

@@ -1,4 +1,5 @@
 using SteamRecordingBrowser.Services;
+using Xunit;
 
 namespace SteamRecordingBrowser.Tests;
 

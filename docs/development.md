@@ -72,11 +72,13 @@ eng/Build-Release.ps1
 
 The release script:
 
-1. reads the semantic version from the application `.csproj`;
+1. reads the semantic version from `Directory.Build.props`;
 2. restores dependencies;
 3. publishes Windows x64 as self-contained;
 4. validates the application executable and libVLC plugin tree;
-5. creates a portable release ZIP under `artifacts/publish/`.
+5. copies project and third-party notices into the application folder;
+6. creates a portable release ZIP and SHA-256 checksum under
+   `artifacts/publish/`.
 
 Release naming:
 
