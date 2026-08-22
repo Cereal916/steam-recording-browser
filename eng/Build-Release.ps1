@@ -6,13 +6,14 @@ $ErrorActionPreference = 'Stop'
 $BuildRoot = $PSScriptRoot
 $RepoRoot = Split-Path -Parent $BuildRoot
 $Project = Join-Path $RepoRoot 'src\SteamRecordingBrowser\SteamRecordingBrowser.csproj'
+$BuildProps = Join-Path $RepoRoot 'Directory.Build.props'
 $PublishRoot = Join-Path $RepoRoot 'artifacts\publish'
 
-[xml]$ProjectXml = Get-Content -Path $Project -Raw
-$Version = [string]($ProjectXml.Project.PropertyGroup.Version | Select-Object -First 1)
+[xml]$BuildPropsXml = Get-Content -Path $BuildProps -Raw
+$Version = [string]($BuildPropsXml.Project.PropertyGroup.VersionPrefix | Select-Object -First 1)
 
 if ([string]::IsNullOrWhiteSpace($Version)) {
-    throw "Could not read <Version> from $Project"
+    throw "Could not read <VersionPrefix> from $BuildProps"
 }
 
 $AppFolder = Join-Path $PublishRoot "SteamRecordingBrowser-$Version-win-x64"

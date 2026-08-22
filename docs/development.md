@@ -89,16 +89,18 @@ SteamRecordingBrowser-<version>-win-x64.zip
 
 The project follows semantic versioning beginning with `1.0.0`.
 
-Update the following together for each release:
+Update `<VersionPrefix>` in the repository-level `Directory.Build.props` for
+each release. It is the single source used to generate:
 
-- `<Version>`
 - `<AssemblyVersion>`
 - `<FileVersion>`
-- user-visible application version
-- `CHANGELOG.md`
+- assembly/package metadata
+- user-visible application version labels and logs
+- exported metadata version information
+- release artifact names
 
-The release build script reads the version from the project file and should not
-contain a separately maintained application version.
+Add a corresponding historical entry to `CHANGELOG.md`. The release build
+script reads the centralized version and does not maintain a separate copy.
 
 ## Local runtime data
 

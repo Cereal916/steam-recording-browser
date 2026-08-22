@@ -151,3 +151,6 @@ so production releases intentionally remain a portable folder/ZIP rather than
 forcing the application into a single executable.
 
 Keep all files in the published folder together.
+
+## License
+Steam Recording Browser is available under the [MIT License](LICENSE).
