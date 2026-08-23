@@ -40,6 +40,18 @@ ready-to-use commit message so they can be reviewed and committed consistently.
 - Checkboxes must inherit the application-level dark `CheckBox` template so
   unchecked, checked, hovered, keyboard-focused, and disabled states remain
   readable and do not fall back to native light Windows chrome.
+- Context menus must inherit the application-level dark `ContextMenu`,
+  `MenuItem`, and `Separator` templates. Verify the popup surface, borders,
+  item text, icons, gesture text, separators, hover, keyboard focus, and
+  disabled states instead of relying on native light Windows menu chrome.
+- Text inside padded cards, borders, dialogs, popups, and tooltips must be
+  verified at its actual rendered size, including the final wrapped line.
+  Prefer `Auto` sizing or content-sized dialogs when text can wrap; do not put
+  variable-height text in a constrained fixed or star-sized row that can clip
+  descenders or hide the bottom line behind container padding.
+- UI layout verification must include long or wrapping copy, non-maximized
+  windows, and display scaling. A feature is not complete if text overlaps,
+  clips, or is obscured by padding at any supported minimum window size.
 - After making any source-code change, an AI assistant must end its final
   response with a concise commit message that accurately summarizes the change.
 - The commit message must be the final line of the response and use the format

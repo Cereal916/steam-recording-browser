@@ -9,6 +9,7 @@ $Project = Join-Path $RepoRoot 'src\SteamRecordingBrowser\SteamRecordingBrowser.
 $BuildProps = Join-Path $RepoRoot 'Directory.Build.props'
 $License = Join-Path $RepoRoot 'LICENSE'
 $ThirdPartyNotices = Join-Path $RepoRoot 'THIRD-PARTY-NOTICES.md'
+$AcquireFfmpeg = Join-Path $BuildRoot 'Acquire-FFmpeg.ps1'
 $PublishRoot = Join-Path $RepoRoot 'artifacts\publish'
 
 [xml]$BuildPropsXml = Get-Content -Path $BuildProps -Raw
@@ -84,6 +85,14 @@ if (-not $libvlc) {
 }
 if (-not $plugins) {
     Write-Warning 'A libVLC plugins folder was not found in the publish output.'
+}
+
+& $AcquireFfmpeg -Destination (Join-Path $AppFolder 'ffmpeg')
+if ($LASTEXITCODE -ne 0) { throw "FFmpeg acquisition failed: $LASTEXITCODE" }
+
+if (-not (Test-Path (Join-Path $AppFolder 'ffmpeg\bin\ffmpeg.exe')) -or
+    -not (Test-Path (Join-Path $AppFolder 'ffmpeg\bin\ffprobe.exe'))) {
+    throw 'FFmpeg release tools were not bundled correctly.'
 }
 
 Copy-Item -LiteralPath $License -Destination $AppFolder

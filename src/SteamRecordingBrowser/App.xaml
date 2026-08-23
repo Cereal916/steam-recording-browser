@@ -111,6 +111,107 @@
             </Setter>
         </Style>
 
+        <Style TargetType="ContextMenu">
+            <Setter Property="Foreground" Value="#F4F7FB"/>
+            <Setter Property="Background" Value="#151922"/>
+            <Setter Property="BorderBrush" Value="#343C49"/>
+            <Setter Property="BorderThickness" Value="1"/>
+            <Setter Property="Padding" Value="5"/>
+            <Setter Property="HasDropShadow" Value="True"/>
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="ContextMenu">
+                        <Border Background="{TemplateBinding Background}"
+                                BorderBrush="{TemplateBinding BorderBrush}"
+                                BorderThickness="{TemplateBinding BorderThickness}"
+                                CornerRadius="6"
+                                Padding="{TemplateBinding Padding}">
+                            <Border.Effect>
+                                <DropShadowEffect Color="#000000"
+                                                  BlurRadius="14"
+                                                  ShadowDepth="3"
+                                                  Opacity="0.55"/>
+                            </Border.Effect>
+                            <StackPanel IsItemsHost="True" KeyboardNavigation.DirectionalNavigation="Cycle"/>
+                        </Border>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+        </Style>
+
+        <Style TargetType="MenuItem">
+            <Setter Property="Foreground" Value="#F4F7FB"/>
+            <Setter Property="Background" Value="Transparent"/>
+            <Setter Property="Padding" Value="11,8"/>
+            <Setter Property="Cursor" Value="Hand"/>
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="MenuItem">
+                        <Border x:Name="MenuItemBorder"
+                                Background="{TemplateBinding Background}"
+                                CornerRadius="4"
+                                Padding="{TemplateBinding Padding}">
+                            <Grid>
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="Auto"/>
+                                    <ColumnDefinition Width="*"/>
+                                    <ColumnDefinition Width="Auto"/>
+                                </Grid.ColumnDefinitions>
+                                <ContentPresenter Grid.Column="0"
+                                                  ContentSource="Icon"
+                                                  Margin="0,0,8,0"
+                                                  VerticalAlignment="Center"/>
+                                <ContentPresenter Grid.Column="1"
+                                                  ContentSource="Header"
+                                                  RecognizesAccessKey="True"
+                                                  VerticalAlignment="Center"/>
+                                <TextBlock Grid.Column="2"
+                                           Text="{TemplateBinding InputGestureText}"
+                                           Foreground="#98A2B3"
+                                           Margin="20,0,0,0"
+                                           VerticalAlignment="Center"/>
+                            </Grid>
+                        </Border>
+                        <ControlTemplate.Triggers>
+                            <Trigger Property="IsHighlighted" Value="True">
+                                <Setter TargetName="MenuItemBorder" Property="Background" Value="#263142"/>
+                            </Trigger>
+                            <Trigger Property="IsKeyboardFocused" Value="True">
+                                <Setter TargetName="MenuItemBorder" Property="Background" Value="#263142"/>
+                            </Trigger>
+                            <Trigger Property="IsEnabled" Value="False">
+                                <Setter TargetName="MenuItemBorder" Property="Opacity" Value="0.5"/>
+                                <Setter Property="Foreground" Value="#7F8998"/>
+                                <Setter Property="Cursor" Value="Arrow"/>
+                            </Trigger>
+                        </ControlTemplate.Triggers>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+        </Style>
+
+        <Style TargetType="Separator">
+            <Setter Property="Margin" Value="10,5"/>
+            <Setter Property="Focusable" Value="False"/>
+            <Setter Property="IsHitTestVisible" Value="False"/>
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="Separator">
+                        <Rectangle Height="1" Opacity="0.72">
+                            <Rectangle.Fill>
+                                <LinearGradientBrush StartPoint="0,0.5" EndPoint="1,0.5">
+                                    <GradientStop Color="#00343C49" Offset="0"/>
+                                    <GradientStop Color="#465264" Offset="0.18"/>
+                                    <GradientStop Color="#465264" Offset="0.82"/>
+                                    <GradientStop Color="#00343C49" Offset="1"/>
+                                </LinearGradientBrush>
+                            </Rectangle.Fill>
+                        </Rectangle>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+        </Style>
+
         <Style x:Key="ScrollBarThumbStyle" TargetType="Thumb">
             <Setter Property="Background" Value="{StaticResource ScrollBarThumbBrush}"/>
             <Setter Property="Margin" Value="3"/>

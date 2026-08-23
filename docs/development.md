@@ -9,6 +9,17 @@
 libVLC is restored from NuGet; a separate VLC installation is not required for
 development or end-user deployment.
 
+Transcoded exports use FFmpeg. Release packaging downloads and verifies the
+approved build automatically. To test transcoding from Rider, acquire the same
+tools into the ignored local tool directory:
+
+```powershell
+pwsh ./eng/Acquire-FFmpeg.ps1 -Destination ./.tools/ffmpeg
+```
+
+The project copies that folder into build output without committing binaries.
+Alternatively, developers may put `ffmpeg.exe` and `ffprobe.exe` on `PATH`.
+
 ## JetBrains Rider
 
 Open:
@@ -76,8 +87,10 @@ The release script:
 2. restores dependencies;
 3. publishes Windows x64 as self-contained;
 4. validates the application executable and libVLC plugin tree;
-5. copies project and third-party notices into the application folder;
-6. creates a portable release ZIP and SHA-256 checksum under
+5. downloads and checksum-verifies the approved FFmpeg GPL build;
+6. bundles FFmpeg's license and corresponding-source notice;
+7. copies project and third-party notices into the application folder;
+8. creates a portable release ZIP and SHA-256 checksum under
    `artifacts/publish/`.
 
 Release naming:

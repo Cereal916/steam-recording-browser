@@ -34,4 +34,12 @@
     <Resource Include="Assets\SteamRecordingBrowser.ico" />
   </ItemGroup>
 
+  <ItemGroup Condition="Exists('..\..\.tools\ffmpeg\bin\ffmpeg.exe')">
+    <Content Include="..\..\.tools\ffmpeg\**\*">
+      <Link>ffmpeg\%(RecursiveDir)%(Filename)%(Extension)</Link>
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+      <CopyToPublishDirectory>PreserveNewest</CopyToPublishDirectory>
+    </Content>
+  </ItemGroup>
+
 </Project>

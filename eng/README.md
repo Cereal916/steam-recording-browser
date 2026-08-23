@@ -34,6 +34,8 @@ The release script:
 - restores dependencies
 - publishes `win-x64` as self-contained
 - validates the executable and bundled libVLC plugin tree
+- downloads a checksum-verified FFmpeg 8.1 GPL build and bundles its separate
+  executables, license, and corresponding-source notice
 - writes release output to `artifacts/publish/`
 - creates a portable ZIP
 

@@ -2057,58 +2057,49 @@ private readonly DispatcherTimer _hoverFramePauseTimer;
         UpdateMetadataDisplay();
     }
 
-    private async void Export_Click(object sender, RoutedEventArgs e)
+    private void Export_Click(object sender, RoutedEventArgs e)
     {
+        var options = new ExportOptionsWindow(
+            _vlc.GetVideoCodec(_item.Path),
+            _item.DurationSeconds,
+            _item.SizeBytes) { Owner = this };
+        if (options.ShowDialog() != true)
+            return;
+
         var dialog = new Microsoft.Win32.SaveFileDialog
         {
             Title = "Export recording to MP4",
             Filter = "MP4 video (*.mp4)|*.mp4",
-            FileName = $"{SafeFilePart(_item.GameName)} - {_item.Timestamp:yyyy-MM-dd_HH-mm-ss}.mp4"
+            FileName = $"{SafeFilePart(_item.GameName)} - {_item.Timestamp:yyyy-MM-dd_HH-mm-ss} - {SafeFilePart(options.SelectedCodecFileLabel)}.mp4"
         };
 
         if (dialog.ShowDialog(this) != true)
             return;
 
-        try
+        var wasPlaying = _player.IsPlaying;
+        if (wasPlaying)
+            _player.Pause();
+
+        var progressWindow = new ExportProgressWindow((progress, cancellationToken) =>
+            _vlc.ExportMp4Async(_item, dialog.FileName, options.SelectedCodec, progress, cancellationToken))
         {
-            var wasPlaying = _player.IsPlaying;
-            if (wasPlaying)
-                _player.Pause();
+            Owner = this
+        };
 
-            var progress = new Progress<string>(status =>
-            {
-                ClipInfoText.Text = status;
-            });
+        var completed = progressWindow.ShowDialog() == true;
+        ClipInfoText.Text = $"{_item.GameName}  •  {_item.DisplayTime}";
 
-            await _vlc.ExportMp4Async(
-                _item,
-                dialog.FileName,
-                progress,
-                CancellationToken.None);
+        if (wasPlaying)
+            _player.Play();
 
-            ClipInfoText.Text = $"{_item.GameName}  •  {_item.DisplayTime}";
-
+        if (completed)
+        {
             System.Windows.MessageBox.Show(
                 this,
                 $"Export complete:\n\n{dialog.FileName}",
                 "Steam Recording Browser",
                 MessageBoxButton.OK,
                 MessageBoxImage.Information);
-
-            if (wasPlaying)
-                _player.Play();
-        }
-        catch (Exception ex)
-        {
-            AppLogger.WriteException("Player export failed", ex);
-            ClipInfoText.Text = $"{_item.GameName}  •  {_item.DisplayTime}";
-
-            System.Windows.MessageBox.Show(
-                this,
-                ex.Message,
-                "Export failed",
-                MessageBoxButton.OK,
-                MessageBoxImage.Error);
         }
     }
 

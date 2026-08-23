@@ -26,6 +26,9 @@ TestResults/
 coverage/
 coverage.*
 
+# Locally acquired external media tools
+.tools/
+
 # OS noise
 Thumbs.db
 .DS_Store

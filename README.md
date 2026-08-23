@@ -39,6 +39,8 @@ folder containing your Steam recording sessions.
 - Steam DASH compatibility manifest generation without modifying originals
 - Timeline seeking and frame preview
 - MP4 remux export through bundled libVLC
+- H.264, HEVC, and AV1 transcoding through bundled FFmpeg
+- Automatic NVENC, Quick Sync, and AMF encoding with software fallback
 - Startup progress UI
 - Self-contained Windows x64 deployment
 
@@ -49,10 +51,11 @@ folder containing your Steam recording sessions.
 - .NET 10
 - LibVLCSharp.WPF
 - VideoLAN libVLC
+- FFmpeg 8.1 (separate bundled GPL executable for transcoding)
 - Windows x64
 
 The published application is self-contained and does not require a separate
-.NET runtime, VLC installation, or PowerShell installation.
+.NET runtime, VLC installation, FFmpeg installation, or PowerShell installation.
 
 ## Repository layout
 

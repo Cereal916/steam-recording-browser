@@ -38,5 +38,23 @@ Source and license information are available at:
 - https://github.com/dotnet/runtime
 - https://github.com/dotnet/runtime/blob/main/LICENSE.TXT
 
+## FFmpeg 8.1 GPL build
+
+Production release packages include `ffmpeg.exe` and `ffprobe.exe` from the
+BtbN Windows x64 GPL static build. Steam Recording Browser invokes these as
+separate, replaceable programs for transcoding and output validation. FFmpeg
+and the optional libraries enabled in this build remain under the GNU GPL and
+their respective compatible licenses; they are not covered by this project's
+MIT license.
+
+Each portable release includes `ffmpeg/SOURCE-AND-LICENSE.txt` with the exact
+binary URL, verified SHA-256 hash, build identification, corresponding-source
+locations, and license information. Upstream resources:
+
+- https://ffmpeg.org/
+- https://ffmpeg.org/legal.html
+- https://github.com/FFmpeg/FFmpeg/tree/n8.1
+- https://github.com/BtbN/FFmpeg-Builds
+
 This notice is provided for attribution and license compliance. It does not
 change the MIT license that applies to Steam Recording Browser's own source.

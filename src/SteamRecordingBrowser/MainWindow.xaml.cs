@@ -710,31 +710,36 @@ public partial class MainWindow : Window
         }
     }
 
-    private async Task ExportSelectedAsync()
+    private void ExportSelected()
     {
         var item = SelectedItem;
         if (item is null) return;
+
+        var options = new ExportOptionsWindow(
+            _vlc.GetVideoCodec(item.Path),
+            item.DurationSeconds,
+            item.SizeBytes) { Owner = this };
+        if (options.ShowDialog() != true) return;
 
         var dialog = new Microsoft.Win32.SaveFileDialog
         {
             Title = "Export recording to MP4",
             Filter = "MP4 video (*.mp4)|*.mp4",
-            FileName = $"{SafeFilePart(item.GameName)} - {item.Timestamp:yyyy-MM-dd_HH-mm-ss}.mp4"
+            FileName = $"{SafeFilePart(item.GameName)} - {item.Timestamp:yyyy-MM-dd_HH-mm-ss} - {SafeFilePart(options.SelectedCodecFileLabel)}.mp4"
         };
 
         if (dialog.ShowDialog(this) != true) return;
 
-        try
+        var progressWindow = new ExportProgressWindow((progress, cancellationToken) =>
+            _vlc.ExportMp4Async(item, dialog.FileName, options.SelectedCodec, progress, cancellationToken))
         {
-            var progress = new Progress<string>(s => StatusText.Text = s);
-            await _vlc.ExportMp4Async(item, dialog.FileName, progress, CancellationToken.None);
+            Owner = this
+        };
+
+        if (progressWindow.ShowDialog() == true)
+        {
             WpfMessageBox.Show(this, $"Export complete:\n\n{dialog.FileName}",
                 "Steam Recording Browser", WpfMessageBoxButton.OK, WpfMessageBoxImage.Information);
-        }
-        catch (Exception ex)
-        {
-            AppLogger.WriteException("Export failed", ex);
-            WpfMessageBox.Show(this, ex.Message, "Export failed", WpfMessageBoxButton.OK, WpfMessageBoxImage.Error);
         }
     }
 
@@ -747,7 +752,7 @@ public partial class MainWindow : Window
 
     private void RecordingList_MouseDoubleClick(object sender, System.Windows.Input.MouseButtonEventArgs e) => PlaySelected();
     private void PlayMenu_Click(object sender, RoutedEventArgs e) => PlaySelected();
-    private async void ExportMenu_Click(object sender, RoutedEventArgs e) => await ExportSelectedAsync();
+    private void ExportMenu_Click(object sender, RoutedEventArgs e) => ExportSelected();
 
     private void FavoriteMenu_Click(object sender, RoutedEventArgs e)
     {

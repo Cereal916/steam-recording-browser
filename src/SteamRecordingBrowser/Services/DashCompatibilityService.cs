@@ -9,6 +9,50 @@ namespace SteamRecordingBrowser.Services;
 
 public sealed class DashCompatibilityService
 {
+    public VideoCodecInfo GetVideoCodec(string mpdPath)
+    {
+        try
+        {
+            var doc = XDocument.Load(mpdPath);
+            var root = doc.Root;
+            if (root is null)
+                return VideoCodecInfo.Unknown;
+
+            var ns = root.Name.Namespace;
+            var representation = root
+                .Descendants(ns + "Representation")
+                .FirstOrDefault(element =>
+                {
+                    var parent = element.Parent;
+                    var contentType = parent?.Attribute("contentType")?.Value;
+                    var mimeType = element.Attribute("mimeType")?.Value
+                                   ?? parent?.Attribute("mimeType")?.Value;
+                    return contentType?.Equals("video", StringComparison.OrdinalIgnoreCase) == true ||
+                           mimeType?.StartsWith("video/", StringComparison.OrdinalIgnoreCase) == true;
+                });
+
+            var codecValue = representation?.Attribute("codecs")?.Value
+                             ?? representation?.Parent?.Attribute("codecs")?.Value;
+            if (string.IsNullOrWhiteSpace(codecValue))
+                return VideoCodecInfo.Unknown;
+
+            var normalized = codecValue.Trim().ToLowerInvariant();
+            if (normalized.StartsWith("avc1") || normalized.StartsWith("avc3") || normalized.Contains("h264"))
+                return new VideoCodecInfo("H.264", ExportVideoCodec.H264);
+            if (normalized.StartsWith("hvc1") || normalized.StartsWith("hev1") || normalized.Contains("hevc") || normalized.Contains("h265"))
+                return new VideoCodecInfo("HEVC / H.265", ExportVideoCodec.Hevc);
+            if (normalized.StartsWith("av01") || normalized.Contains("av1"))
+                return new VideoCodecInfo("AV1", ExportVideoCodec.Av1);
+
+            return new VideoCodecInfo(codecValue, null);
+        }
+        catch (Exception ex)
+        {
+            AppLogger.Write($"Could not detect MPD video codec for {mpdPath}: {ex.Message}", "WARN");
+            return VideoCodecInfo.Unknown;
+        }
+    }
+
     public double GetDurationSeconds(string mpdPath)
     {
         try
@@ -159,4 +203,9 @@ public sealed class DashCompatibilityService
         try { return System.Xml.XmlConvert.ToTimeSpan(value).TotalSeconds; }
         catch { return 0; }
     }
+}
+
+public sealed record VideoCodecInfo(string DisplayName, ExportVideoCodec? ExportCodec)
+{
+    public static VideoCodecInfo Unknown { get; } = new("Unknown codec", null);
 }

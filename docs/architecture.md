@@ -52,6 +52,16 @@ Used for:
 - integrated playback;
 - MP4 stream-copy/remux export.
 
+### `FfmpegExportService`
+
+Invokes the separate bundled FFmpeg tools for H.264, HEVC, and AV1 exports.
+It selects supported NVIDIA NVENC, Intel Quick Sync, or AMD AMF encoders first
+and falls back to libx264, libx265, SVT-AV1, or libaom software encoding.
+
+The service parses machine-readable progress, supports cancellation, removes
+failed partial files, retries after unsupported hardware encoders, and uses
+ffprobe to require both video and audio streams before reporting success.
+
 ### `PlayerWindow`
 
 WPF player using `LibVLCSharp.WPF.VideoView`.
@@ -65,6 +75,7 @@ The portable output includes:
 - managed dependencies
 - libVLC native binaries
 - libVLC plugin directory
+- separate `ffmpeg.exe` and `ffprobe.exe` tools plus their license/source notice
 
 Nothing is installed globally.
 
