@@ -381,5 +381,26 @@
                            Foreground="#667080" VerticalAlignment="Center"/>
             </Grid>
         </Border>
+
+        <!-- Keep startup input blocked without applying WPF's light-colored
+             disabled state to every control in the dark visual tree. -->
+        <Border x:Name="StartupInputBlocker"
+                Grid.RowSpan="3"
+                Panel.ZIndex="100"
+                Background="#D90D1015"
+                Visibility="Visible">
+            <StackPanel HorizontalAlignment="Center"
+                        VerticalAlignment="Center">
+                <TextBlock Text="Finishing startup…"
+                           Foreground="#F4F7FB"
+                           FontSize="16"
+                           FontWeight="SemiBold"
+                           HorizontalAlignment="Center"/>
+                <TextBlock Text="Steam Recording Browser will be ready shortly"
+                           Foreground="#98A2B3"
+                           Margin="0,7,0,0"
+                           HorizontalAlignment="Center"/>
+            </StackPanel>
+        </Border>
     </Grid>
 </Window>

@@ -59,6 +59,7 @@ public partial class App : Application
 
                     var main = new MainWindow(progress);
                     MainWindow = main;
+                    main.SetStartupInteractionBlocked(true);
 
                     main.InitialLoadCompleted += (_, _) =>
                     {
@@ -82,7 +83,9 @@ public partial class App : Application
                                 {
                                     closeTimer.Stop();
                                     splash.Close();
+                                    main.SetStartupInteractionBlocked(false);
                                     main.Activate();
+                                    main.Focus();
                                     OfferDesktopShortcut(main);
                                 };
 
@@ -96,6 +99,8 @@ public partial class App : Application
                                 ex);
 
                             try { splash.Close(); } catch { }
+                            main.SetStartupInteractionBlocked(false);
+                            main.Activate();
                         }
                     };
 

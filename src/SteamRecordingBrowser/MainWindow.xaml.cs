@@ -29,6 +29,13 @@ public partial class MainWindow : Window
 
     public event EventHandler? InitialLoadCompleted;
 
+    public void SetStartupInteractionBlocked(bool isBlocked)
+    {
+        StartupInputBlocker.Visibility = isBlocked
+            ? Visibility.Visible
+            : Visibility.Collapsed;
+    }
+
     private readonly List<RecordingItem> _allItems = new();
     private readonly ObservableCollection<RecordingItem> _visibleItems = new();
 
@@ -665,6 +672,17 @@ public partial class MainWindow : Window
         try
         {
             var player = new PlayerWindow(_vlc, _metadata, item) { Owner = this };
+            player.Closing += (_, _) =>
+            {
+                // Raise the owner before libVLC begins its synchronous teardown.
+                // Waiting for Closed allows Windows to expose another app while
+                // the native players stop and dispose.
+                if (!IsVisible || WindowState == WindowState.Minimized)
+                    return;
+
+                Activate();
+                Focus();
+            };
             player.Show();
         }
         catch (Exception ex)
