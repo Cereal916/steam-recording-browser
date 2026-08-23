@@ -43,6 +43,7 @@ folder containing your Steam recording sessions.
 - Automatic NVENC, Quick Sync, and AMF encoding with software fallback
 - Startup progress UI
 - Self-contained Windows x64 deployment
+- Live diagnostic log viewer with pause, search, severity toggles, and bounded history
 
 ## Technology
 
@@ -156,9 +157,10 @@ Runtime data is intentionally stored outside the repository.
   the `libvlc` directory is still present.
 - **Windows blocks startup:** confirm the ZIP came from this repository and
   verify its SHA-256 checksum before allowing the unsigned application.
-- **Need diagnostic information:** use **Open log** in the main window. When
-  filing a bug, remove any paths or other personal information you do not want
-  to share.
+- **Need diagnostic information:** use **Open log** in the main window to watch,
+  pause, search, or filter live entries, or open the raw file from the viewer.
+  When filing a bug, remove any paths or other personal information you do not
+  want to share.
 
 For unresolved problems, open a
 [bug report](https://github.com/Cereal916/steam-recording-browser/issues/new/choose).

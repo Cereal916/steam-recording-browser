@@ -64,6 +64,14 @@ ffprobe to require both video and audio streams before reporting success. Users
 can disable hardware candidates when they prefer slower, more efficient
 software encoding.
 
+### `AppLogger` and `LogViewerWindow`
+
+`AppLogger` writes the application log under a lock and publishes completed
+entries to in-process subscribers. The non-modal log viewer loads only a bounded
+tail of the existing file, batches live UI updates, virtualizes its entry list,
+and retains at most 5,000 displayed or paused entries. Closing the viewer stops
+its timer and unsubscribes from logger events, leaving no ongoing UI overhead.
+
 ### `PlayerWindow`
 
 WPF player using `LibVLCSharp.WPF.VideoView`.

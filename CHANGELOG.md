@@ -4,6 +4,19 @@ All notable changes to Steam Recording Browser are documented here.
 
 The project adopts semantic versioning beginning with **1.0.0**.
 
+## Unreleased
+
+### Added
+
+- Added a dark-themed live log viewer with batched updates, virtualized bounded
+  history, pause/resume, independent severity toggles, search, clear-display,
+  smart auto-scroll, and access to the raw log file.
+
+### Fixed
+
+- Fixed the native light corner appearing where horizontal and vertical
+  scrollbars meet in dark-themed scrolling surfaces.
+
 ## 1.2.0 - 2026-08-23
 
 ### Added
@@ -19,7 +32,6 @@ The project adopts semantic versioning beginning with **1.0.0**.
   that are promoted to the final filename only after validation succeeds.
 - Added licensing notices, checksum verification, and exact corresponding-source
   metadata for the bundled FFmpeg GPL build.
-
 ### Changed
 
 - Kept Original codec exports on the existing lossless libVLC remux path while

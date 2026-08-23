@@ -44,6 +44,15 @@ ready-to-use commit message so they can be reviewed and committed consistently.
   `MenuItem`, and `Separator` templates. Verify the popup surface, borders,
   item text, icons, gesture text, separators, hover, keyboard focus, and
   disabled states instead of relying on native light Windows menu chrome.
+- Scrollable controls must inherit the complete application-level dark
+  `ScrollViewer` and `ScrollBar` templates. Styling only the track or thumb is
+  insufficient: the line/page buttons, horizontal and vertical tracks, and
+  the bottom-right intersection where both scrollbars meet must all have
+  explicit dark surfaces so WPF cannot display native light chrome.
+- Scrollbar verification must cover vertical-only, horizontal-only, and
+  simultaneous two-axis overflow. Check the full top, bottom, left, and right
+  edges—including the bottom-right corner—in non-maximized windows, at the
+  supported minimum size, and with display scaling enabled.
 - Text inside padded cards, borders, dialogs, popups, and tooltips must be
   verified at its actual rendered size, including the final wrapped line.
   Prefer `Auto` sizing or content-sized dialogs when text can wrap; do not put

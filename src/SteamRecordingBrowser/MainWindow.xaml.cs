@@ -48,6 +48,7 @@ public partial class MainWindow : Window
     private string _sortMode = "Newest";
     private string _recordingRoot = "";
     private bool _clipLayoutChangedFromSettings;
+    private LogViewerWindow? _logViewer;
 
     private async void Settings_Click(object sender, RoutedEventArgs e)
     {
@@ -855,10 +856,16 @@ public partial class MainWindow : Window
 
     private void OpenLog_Click(object sender, RoutedEventArgs e)
     {
-        if (!File.Exists(AppLogger.LogPath))
-            File.WriteAllText(AppLogger.LogPath, "");
+        if (_logViewer is { IsLoaded: true })
+        {
+            _logViewer.Activate();
+            _logViewer.Focus();
+            return;
+        }
 
-        Process.Start(new ProcessStartInfo(AppLogger.LogPath) { UseShellExecute = true });
+        _logViewer = new LogViewerWindow { Owner = this };
+        _logViewer.Closed += (_, _) => _logViewer = null;
+        _logViewer.Show();
     }
 
     private void InitializeRecordingRoot()
