@@ -20,7 +20,6 @@ public partial class App : Application
         var splash = new SplashWindow();
         splash.SetProgress(2, "Starting application…");
         splash.Show();
-        splash.UpdateLayout();
 
         // Yield between the expensive early startup stages so the splash can
         // repaint instead of appearing frozen at a single percentage.
@@ -38,7 +37,11 @@ public partial class App : Application
                     await System.Windows.Threading.Dispatcher.Yield(
                         System.Windows.Threading.DispatcherPriority.Background);
 
-                    Core.Initialize();
+                    // Native libVLC discovery and loading can take long enough
+                    // for Rider's UI-freeze monitor to flag the dispatcher.
+                    // Nothing uses libVLC until this completes, so initialize
+                    // it away from the WPF UI thread and keep the splash live.
+                    await Task.Run(() => Core.Initialize());
 
                     splash.SetProgress(14, "Video engine ready…");
                     await System.Windows.Threading.Dispatcher.Yield(
