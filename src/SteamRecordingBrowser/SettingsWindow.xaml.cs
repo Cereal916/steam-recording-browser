@@ -10,17 +10,33 @@ public partial class SettingsWindow : Window
     private readonly SettingsService _settings = new();
     private readonly MetadataService _metadata;
     private readonly IReadOnlyCollection<RecordingItem> _recordings;
+    private bool _initializingLayout;
 
     public bool RecordingRootChanged { get; private set; }
     public bool MetadataImported { get; private set; }
+    public bool ClipLayoutChanged { get; private set; }
 
     public SettingsWindow(MetadataService metadata, IReadOnlyCollection<RecordingItem> recordings)
     {
         _metadata = metadata;
         _recordings = recordings;
         InitializeComponent();
-        RecordingRootBox.Text = _settings.Load().RecordingRoot;
+        var settings = _settings.Load();
+        RecordingRootBox.Text = settings.RecordingRoot;
+        _initializingLayout = true;
+        LayoutSelector.ItemsSource = new[] { "List", "Tiles" };
+        LayoutSelector.SelectedItem = settings.UseTileLayout ? "Tiles" : "List";
+        _initializingLayout = false;
         UpdateShortcutStatus();
+    }
+
+    private void LayoutSelector_SelectionChanged(object sender, System.Windows.Controls.SelectionChangedEventArgs e)
+    {
+        if (_initializingLayout)
+            return;
+
+        _settings.SaveUseTileLayout(LayoutSelector.SelectedItem as string == "Tiles");
+        ClipLayoutChanged = true;
     }
 
     private void BackupMetadata_Click(object sender, RoutedEventArgs e)

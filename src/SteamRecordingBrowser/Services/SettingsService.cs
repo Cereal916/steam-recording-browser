@@ -52,6 +52,15 @@ public sealed class SettingsService
         Save(settings);
     }
 
+    public void SaveUseTileLayout(bool useTileLayout)
+    {
+        var settings = Load();
+        settings.UseTileLayout = useTileLayout;
+        Save(settings);
+
+        AppLogger.Write($"Saved clip layout: {(useTileLayout ? "Tiles" : "List")}");
+    }
+
     private static void Save(AppSettings settings)
     {
         try
@@ -76,4 +85,5 @@ public sealed class AppSettings
 {
     public string RecordingRoot { get; set; } = "";
     public bool DesktopShortcutPromptShown { get; set; }
+    public bool UseTileLayout { get; set; }
 }

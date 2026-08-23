@@ -23,6 +23,23 @@ ready-to-use commit message so they can be reviewed and committed consistently.
   apply.
 - Existing shared styles and visual patterns should be reused before adding new
   one-off styling.
+- Selector controls must use a complete dark template for both the closed
+  control and popup items. A custom `ComboBox` must explicitly give its
+  internal `ToggleButton` a transparent template so native Windows hover
+  rendering cannot place a light surface over light text.
+- Selector changes must be checked in their normal, hovered, focused, open,
+  highlighted, selected, and disabled states. New selectors must reuse the
+  established application selector template instead of the native WPF
+  `ComboBox` template or a partially styled replacement.
+- Buttons must inherit the application-level dark `Button` template rather
+  than relying on the native WPF template. Verify readable foreground and dark
+  backgrounds in normal, hovered, pressed, keyboard-focused, default, and
+  disabled states. Window-specific button styles may adjust spacing or colors,
+  but must be based on the shared application style unless they provide an
+  equally complete dark control template.
+- Checkboxes must inherit the application-level dark `CheckBox` template so
+  unchecked, checked, hovered, keyboard-focused, and disabled states remain
+  readable and do not fall back to native light Windows chrome.
 - After making any source-code change, an AI assistant must end its final
   response with a concise commit message that accurately summarizes the change.
 - The commit message must be the final line of the response and use the format

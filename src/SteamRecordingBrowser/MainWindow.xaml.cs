@@ -5,6 +5,9 @@ using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Media.Imaging;
 using System.Windows.Threading;
+using MediaColor = System.Windows.Media.Color;
+using SolidColorBrush = System.Windows.Media.SolidColorBrush;
+using TimelineLine = System.Windows.Shapes.Line;
 using LibVLCSharp.Shared;
 using Microsoft.Win32;
 using WpfMessageBox = System.Windows.MessageBox;
@@ -44,10 +47,16 @@ public partial class MainWindow : Window
     private string _selectedTag = "";
     private string _sortMode = "Newest";
     private string _recordingRoot = "";
+    private bool _clipLayoutChangedFromSettings;
 
     private async void Settings_Click(object sender, RoutedEventArgs e)
     {
-        if (ShowSettings() && Directory.Exists(_recordingRoot))
+        var recordingRootChanged = ShowSettings();
+
+        if (_clipLayoutChangedFromSettings)
+            await ApplyClipLayoutTransitionAsync();
+
+        if (recordingRootChanged && Directory.Exists(_recordingRoot))
             await LoadRecordingsAsync();
     }
 
@@ -93,6 +102,8 @@ public partial class MainWindow : Window
         _clipPreviewPlayer.TimeChanged += ClipPreviewPlayer_TimeChanged;
 
         RecordingList.ItemsSource = _visibleItems;
+        TileRecordingList.ItemsSource = _visibleItems;
+        ApplyClipLayout();
 
         SortFilter.ItemsSource = new[] { "Newest", "Oldest", "Largest", "Smallest" };
         SortFilter.SelectedItem = "Newest";
@@ -110,6 +121,9 @@ public partial class MainWindow : Window
                 if (!Directory.Exists(_recordingRoot))
                 {
                     ShowSettings();
+
+                    if (_clipLayoutChangedFromSettings)
+                        ApplyClipLayout();
 
                     if (!Directory.Exists(_recordingRoot))
                     {
@@ -313,6 +327,7 @@ public partial class MainWindow : Window
             _visibleItems.Add(item);
 
         UpdateFilterStatus();
+        Dispatcher.BeginInvoke(DispatcherPriority.Render, new Action(UpdateDateTimeline));
     }
 
     private void UpdateGameFilter()
@@ -662,7 +677,10 @@ public partial class MainWindow : Window
         }
     }
 
-    private RecordingItem? SelectedItem => RecordingList.SelectedItem as RecordingItem;
+    private RecordingItem? SelectedItem =>
+        TileLayoutPanel.Visibility == Visibility.Visible
+            ? TileRecordingList.SelectedItem as RecordingItem
+            : RecordingList.SelectedItem as RecordingItem;
 
     private void PlaySelected()
     {
@@ -867,6 +885,7 @@ public partial class MainWindow : Window
 
     private bool ShowSettings()
     {
+        _clipLayoutChangedFromSettings = false;
         var dialog = new SettingsWindow(_metadata, _allItems)
         {
             Owner = this
@@ -875,6 +894,8 @@ public partial class MainWindow : Window
         dialog.ShowDialog();
         _recordingRoot = _settings.Load().RecordingRoot?.Trim() ?? "";
 
+        _clipLayoutChangedFromSettings = dialog.ClipLayoutChanged;
+
         if (dialog.MetadataImported)
         {
             UpdateTagFilter();
@@ -882,6 +903,99 @@ public partial class MainWindow : Window
         }
 
         return dialog.RecordingRootChanged;
+    }
+
+    private void ApplyClipLayout()
+    {
+        var useTiles = _settings.Load().UseTileLayout;
+        ListLayoutPanel.Visibility = useTiles ? Visibility.Collapsed : Visibility.Visible;
+        TileLayoutPanel.Visibility = useTiles ? Visibility.Visible : Visibility.Collapsed;
+
+        Dispatcher.BeginInvoke(DispatcherPriority.Render, new Action(UpdateDateTimeline));
+    }
+
+    private async Task ApplyClipLayoutTransitionAsync()
+    {
+        LayoutBusyOverlay.Visibility = Visibility.Visible;
+
+        try
+        {
+            // Let the overlay paint before WPF measures and arranges the new
+            // item layout, which can be noticeable for large clip libraries.
+            await Dispatcher.Yield(DispatcherPriority.Render);
+            ApplyClipLayout();
+            await Dispatcher.Yield(DispatcherPriority.ApplicationIdle);
+        }
+        finally
+        {
+            LayoutBusyOverlay.Visibility = Visibility.Collapsed;
+            _clipLayoutChangedFromSettings = false;
+        }
+    }
+
+    private void DateTimelineCanvas_SizeChanged(object sender, SizeChangedEventArgs e) =>
+        UpdateDateTimeline();
+
+    private void UpdateDateTimeline()
+    {
+        RenderDateTimeline(DateTimelineCanvas, ListLayoutPanel.Visibility == Visibility.Visible);
+        RenderDateTimeline(TileDateTimelineCanvas, TileLayoutPanel.Visibility == Visibility.Visible);
+    }
+
+    private void RenderDateTimeline(Canvas timelineCanvas, bool isVisible)
+    {
+        timelineCanvas.Children.Clear();
+
+        var height = timelineCanvas.ActualHeight;
+        if (!isVisible ||
+            height <= 24 ||
+            _visibleItems.Count == 0)
+            return;
+
+        const double railX = 5;
+        const double edgePadding = 12;
+        var usableHeight = height - (edgePadding * 2);
+
+        timelineCanvas.Children.Add(new TimelineLine
+        {
+            X1 = railX,
+            X2 = railX,
+            Y1 = edgePadding,
+            Y2 = height - edgePadding,
+            Stroke = new SolidColorBrush(MediaColor.FromRgb(58, 67, 83)),
+            StrokeThickness = 2
+        });
+
+        var markerCount = Math.Min(8, _visibleItems.Count);
+        for (var marker = 0; marker < markerCount; marker++)
+        {
+            var fraction = markerCount == 1 ? 0d : marker / (double)(markerCount - 1);
+            var itemIndex = (int)Math.Round(fraction * (_visibleItems.Count - 1));
+            var y = edgePadding + (fraction * usableHeight);
+            var item = _visibleItems[itemIndex];
+
+            var tick = new TimelineLine
+            {
+                X1 = railX,
+                X2 = 12,
+                Y1 = y,
+                Y2 = y,
+                Stroke = new SolidColorBrush(MediaColor.FromRgb(102, 192, 244)),
+                StrokeThickness = 2
+            };
+            timelineCanvas.Children.Add(tick);
+
+            var label = new TextBlock
+            {
+                Text = item.Timestamp.ToString("MMM d\nyyyy"),
+                Foreground = new SolidColorBrush(MediaColor.FromRgb(152, 162, 179)),
+                FontSize = 10,
+                LineHeight = 12
+            };
+            Canvas.SetLeft(label, 16);
+            Canvas.SetTop(label, Math.Clamp(y - 12, 0, Math.Max(0, height - 25)));
+            timelineCanvas.Children.Add(label);
+        }
     }
 
     private sealed record GameFilterItem(string Id, string Name);

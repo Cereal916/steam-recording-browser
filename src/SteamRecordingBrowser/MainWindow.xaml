@@ -18,7 +18,8 @@
         <SolidColorBrush x:Key="Muted" Color="#98A2B3"/>
         <SolidColorBrush x:Key="Accent" Color="#66C0F4"/>
 
-        <Style x:Key="ButtonStyle" TargetType="Button">
+        <Style x:Key="ButtonStyle" TargetType="Button"
+               BasedOn="{StaticResource {x:Type Button}}">
             <Setter Property="Foreground" Value="{StaticResource Text}"/>
             <Setter Property="Background" Value="{StaticResource Surface2}"/>
             <Setter Property="BorderBrush" Value="{StaticResource Border}"/>
@@ -106,7 +107,13 @@
                                           BorderThickness="0"
                                           Focusable="False"
                                           ClickMode="Press"
-                                          IsChecked="{Binding IsDropDownOpen, RelativeSource={RelativeSource TemplatedParent}, Mode=TwoWay}"/>
+                                          IsChecked="{Binding IsDropDownOpen, RelativeSource={RelativeSource TemplatedParent}, Mode=TwoWay}">
+                                <ToggleButton.Template>
+                                    <ControlTemplate TargetType="ToggleButton">
+                                        <Border Background="Transparent"/>
+                                    </ControlTemplate>
+                                </ToggleButton.Template>
+                            </ToggleButton>
 
                             <Popup x:Name="PART_Popup"
                                    Placement="Bottom"
@@ -150,7 +157,7 @@
             <Setter Property="Padding" Value="9,6"/>
         </Style>
 
-        <Style TargetType="CheckBox">
+        <Style TargetType="CheckBox" BasedOn="{StaticResource {x:Type CheckBox}}">
             <Setter Property="Foreground" Value="{StaticResource Text}"/>
             <Setter Property="VerticalContentAlignment" Value="Center"/>
         </Style>
@@ -234,16 +241,23 @@
             </StackPanel>
         </Border>
 
-        <ListView x:Name="RecordingList" Grid.Row="1"
+        <Grid x:Name="ListLayoutPanel" Grid.Row="1">
+            <Grid.ColumnDefinitions>
+                <ColumnDefinition Width="*"/>
+                <ColumnDefinition Width="86"/>
+            </Grid.ColumnDefinitions>
+
+        <ListView x:Name="RecordingList" Grid.Column="0"
                   Background="#0D1015" BorderThickness="0"
                   HorizontalContentAlignment="Stretch"
+                  ScrollViewer.HorizontalScrollBarVisibility="Disabled"
                   ScrollViewer.VerticalScrollBarVisibility="Auto"
                   MouseDoubleClick="RecordingList_MouseDoubleClick">
             <ListView.ItemTemplate>
                 <DataTemplate>
                     <Border Background="#151922" BorderBrush="#2B3240" BorderThickness="1"
-                            Width="1040"
-                            HorizontalAlignment="Center"
+                            MaxWidth="1040"
+                            HorizontalAlignment="Stretch"
                             CornerRadius="9" Margin="8,5" Padding="12"
                             MouseEnter="RecordingCard_MouseEnter"
                             MouseLeave="RecordingCard_MouseLeave">
@@ -321,6 +335,152 @@
                 </ContextMenu>
             </ListView.ContextMenu>
         </ListView>
+
+            <Border Grid.Column="1"
+                    Background="#10141B"
+                    BorderBrush="#252C38"
+                    BorderThickness="1,0,0,0">
+                <Canvas x:Name="DateTimelineCanvas"
+                        Margin="5,10,4,10"
+                        SizeChanged="DateTimelineCanvas_SizeChanged"
+                        IsHitTestVisible="False"/>
+            </Border>
+        </Grid>
+
+        <Grid x:Name="TileLayoutPanel" Grid.Row="1" Visibility="Collapsed">
+            <Grid.ColumnDefinitions>
+                <ColumnDefinition Width="*"/>
+                <ColumnDefinition Width="86"/>
+            </Grid.ColumnDefinitions>
+
+        <ListView x:Name="TileRecordingList"
+                  Grid.Column="0"
+                  Background="#0D1015"
+                  BorderThickness="0"
+                  HorizontalContentAlignment="Stretch"
+                  ScrollViewer.HorizontalScrollBarVisibility="Disabled"
+                  ScrollViewer.VerticalScrollBarVisibility="Auto"
+                  MouseDoubleClick="RecordingList_MouseDoubleClick">
+            <ListView.ItemsPanel>
+                <ItemsPanelTemplate>
+                    <WrapPanel HorizontalAlignment="Center"/>
+                </ItemsPanelTemplate>
+            </ListView.ItemsPanel>
+            <ListView.ItemContainerStyle>
+                <Style TargetType="ListViewItem">
+                    <Setter Property="Padding" Value="0"/>
+                    <Setter Property="Margin" Value="7"/>
+                    <Setter Property="HorizontalContentAlignment" Value="Stretch"/>
+                    <Setter Property="Background" Value="Transparent"/>
+                    <Setter Property="BorderThickness" Value="0"/>
+                </Style>
+            </ListView.ItemContainerStyle>
+            <ListView.ItemTemplate>
+                <DataTemplate>
+                    <Border Width="252"
+                            Height="238"
+                            Padding="8"
+                            Background="#151922"
+                            BorderBrush="#2B3240"
+                            BorderThickness="1"
+                            CornerRadius="8"
+                            MouseEnter="RecordingCard_MouseEnter"
+                            MouseLeave="RecordingCard_MouseLeave">
+                        <Grid>
+                            <Grid.RowDefinitions>
+                                <RowDefinition Height="135"/>
+                                <RowDefinition Height="*"/>
+                            </Grid.RowDefinitions>
+                            <Border Background="#080A0E" CornerRadius="5" ClipToBounds="True">
+                                <Grid>
+                                    <Image Source="{Binding DisplayImagePath}">
+                                        <Image.Style>
+                                            <Style TargetType="Image">
+                                                <Setter Property="Stretch" Value="UniformToFill"/>
+                                                <Style.Triggers>
+                                                    <DataTrigger Binding="{Binding ThumbnailPath}" Value="{x:Null}">
+                                                        <Setter Property="Stretch" Value="Uniform"/>
+                                                    </DataTrigger>
+                                                </Style.Triggers>
+                                            </Style>
+                                        </Image.Style>
+                                    </Image>
+                                    <TextBlock Text="No artwork available"
+                                               Foreground="#667080"
+                                               HorizontalAlignment="Center"
+                                               VerticalAlignment="Center">
+                                        <TextBlock.Style>
+                                            <Style TargetType="TextBlock">
+                                                <Setter Property="Visibility" Value="Collapsed"/>
+                                                <Style.Triggers>
+                                                    <DataTrigger Binding="{Binding DisplayImagePath}" Value="{x:Null}">
+                                                        <Setter Property="Visibility" Value="Visible"/>
+                                                    </DataTrigger>
+                                                </Style.Triggers>
+                                            </Style>
+                                        </TextBlock.Style>
+                                    </TextBlock>
+                                    <Border HorizontalAlignment="Right"
+                                            VerticalAlignment="Bottom"
+                                            Margin="6"
+                                            Padding="6,3"
+                                            Background="#D9080A0E"
+                                            CornerRadius="4">
+                                        <TextBlock Text="{Binding DurationText}"
+                                                   Foreground="#F4F7FB"
+                                                   FontWeight="SemiBold"
+                                                   FontSize="12"/>
+                                    </Border>
+                                </Grid>
+                            </Border>
+                            <StackPanel Grid.Row="1" Margin="3,9,3,0">
+                                <DockPanel LastChildFill="True">
+                                    <TextBlock Text="{Binding FavoriteGlyph}"
+                                               Foreground="#F6C85F"
+                                               Margin="0,0,5,0"/>
+                                    <TextBlock Text="{Binding GameName}"
+                                               Foreground="#F4F7FB"
+                                               FontWeight="SemiBold"
+                                               TextTrimming="CharacterEllipsis"/>
+                                </DockPanel>
+                                <TextBlock Text="{Binding DisplayTime}"
+                                           Foreground="#98A2B3"
+                                           FontSize="12"
+                                           Margin="0,5,0,0"/>
+                                <TextBlock Text="{Binding TagDisplay}"
+                                           Foreground="#66C0F4"
+                                           FontSize="12"
+                                           Margin="0,4,0,0"
+                                           TextTrimming="CharacterEllipsis"/>
+                            </StackPanel>
+                        </Grid>
+                    </Border>
+                </DataTemplate>
+            </ListView.ItemTemplate>
+            <ListView.ContextMenu>
+                <ContextMenu>
+                    <MenuItem Header="Play" Click="PlayMenu_Click"/>
+                    <MenuItem Header="Export to MP4…" Click="ExportMenu_Click"/>
+                    <Separator/>
+                    <MenuItem Header="Toggle favorite" Click="FavoriteMenu_Click"/>
+                    <MenuItem Header="Edit description…" Click="DescriptionMenu_Click"/>
+                    <MenuItem Header="Add/edit tags…" Click="TagsMenu_Click"/>
+                    <Separator/>
+                    <MenuItem Header="Open recording folder" Click="OpenFolderMenu_Click"/>
+                </ContextMenu>
+            </ListView.ContextMenu>
+        </ListView>
+
+            <Border Grid.Column="1"
+                    Background="#10141B"
+                    BorderBrush="#252C38"
+                    BorderThickness="1,0,0,0">
+                <Canvas x:Name="TileDateTimelineCanvas"
+                        Margin="5,10,4,10"
+                        SizeChanged="DateTimelineCanvas_SizeChanged"
+                        IsHitTestVisible="False"/>
+            </Border>
+        </Grid>
 
         <!-- One reusable preview popup/decoder is shared by every clip card.
              The thumbnail appears immediately; after a short hover delay the
@@ -401,6 +561,51 @@
                            Margin="0,7,0,0"
                            HorizontalAlignment="Center"/>
             </StackPanel>
+        </Border>
+
+        <Border x:Name="LayoutBusyOverlay"
+                Grid.RowSpan="3"
+                Panel.ZIndex="95"
+                Background="#B30D1015"
+                Visibility="Collapsed">
+            <Border HorizontalAlignment="Center"
+                    VerticalAlignment="Center"
+                    Padding="24,20"
+                    Background="#151922"
+                    BorderBrush="#2B3240"
+                    BorderThickness="1"
+                    CornerRadius="9">
+                <StackPanel HorizontalAlignment="Center">
+                    <Grid Width="42" Height="42" HorizontalAlignment="Center">
+                        <Ellipse Stroke="#303846" StrokeThickness="4"/>
+                        <Ellipse Stroke="#66C0F4"
+                                 StrokeThickness="4"
+                                 StrokeDashArray="2,5"
+                                 StrokeDashCap="Round"
+                                 RenderTransformOrigin="0.5,0.5">
+                            <Ellipse.RenderTransform>
+                                <RotateTransform/>
+                            </Ellipse.RenderTransform>
+                            <Ellipse.Triggers>
+                                <EventTrigger RoutedEvent="Loaded">
+                                    <BeginStoryboard>
+                                        <Storyboard RepeatBehavior="Forever">
+                                            <DoubleAnimation Storyboard.TargetProperty="RenderTransform.Angle"
+                                                             From="0" To="360"
+                                                             Duration="0:0:0.8"/>
+                                        </Storyboard>
+                                    </BeginStoryboard>
+                                </EventTrigger>
+                            </Ellipse.Triggers>
+                        </Ellipse>
+                    </Grid>
+                    <TextBlock Text="Updating clip layout…"
+                               Foreground="#F4F7FB"
+                               FontWeight="SemiBold"
+                               Margin="0,12,0,0"
+                               HorizontalAlignment="Center"/>
+                </StackPanel>
+            </Border>
         </Border>
     </Grid>
 </Window>
