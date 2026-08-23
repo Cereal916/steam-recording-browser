@@ -336,7 +336,7 @@
                             <Image x:Name="ClipPreviewThumbnail"
                                    Stretch="Uniform"/>
                             <vlc:VideoView x:Name="ClipPreviewVideoView"
-                                           Visibility="Collapsed"
+                                           Visibility="Hidden"
                                            IsHitTestVisible="False"/>
                             <TextBlock x:Name="ClipPreviewUnavailableText"
                                        Text="Preview unavailable"

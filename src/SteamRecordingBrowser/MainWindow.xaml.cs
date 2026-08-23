@@ -51,6 +51,8 @@ public partial class MainWindow : Window
     private RecordingItem? _clipPreviewItem;
     private FrameworkElement? _clipPreviewCard;
     private long _clipPreviewGeneration;
+    private long _clipPreviewRevealGeneration;
+    private bool _clipPreviewRevealPending;
 
     public MainWindow(IProgress<StartupProgress>? startupProgress = null)
     {
@@ -81,6 +83,7 @@ public partial class MainWindow : Window
 
         _clipPreviewPlayer.EncounteredError += ClipPreviewPlayer_EncounteredError;
         _clipPreviewPlayer.EndReached += ClipPreviewPlayer_EndReached;
+        _clipPreviewPlayer.TimeChanged += ClipPreviewPlayer_TimeChanged;
 
         RecordingList.ItemsSource = _visibleItems;
 
@@ -126,6 +129,7 @@ public partial class MainWindow : Window
             _clipPreviewDelayTimer.Tick -= ClipPreviewDelayTimer_Tick;
             _clipPreviewPlayer.EncounteredError -= ClipPreviewPlayer_EncounteredError;
             _clipPreviewPlayer.EndReached -= ClipPreviewPlayer_EndReached;
+            _clipPreviewPlayer.TimeChanged -= ClipPreviewPlayer_TimeChanged;
 
             ClipPreviewVideoView.MediaPlayer = null;
             _clipPreviewPlayer.Dispose();
@@ -386,7 +390,8 @@ public partial class MainWindow : Window
 
             SetClipPreviewThumbnail(item.ThumbnailPath);
 
-            ClipPreviewVideoView.Visibility = Visibility.Collapsed;
+            _clipPreviewRevealPending = false;
+            ClipPreviewVideoView.Visibility = Visibility.Hidden;
             ClipPreviewUnavailableText.Visibility = Visibility.Collapsed;
             ClipPreviewThumbnail.Visibility = Visibility.Visible;
 
@@ -437,6 +442,8 @@ public partial class MainWindow : Window
             // manifest path, so clip previews get the same Steam DASH fixes.
             _clipPreviewMedia = _vlc.CreatePlaybackMedia(item.Path);
             _clipPreviewMedia.AddOption(":no-audio");
+            _clipPreviewRevealGeneration = generation;
+            _clipPreviewRevealPending = true;
 
             if (!_clipPreviewPlayer.Play(_clipPreviewMedia))
             {
@@ -456,8 +463,6 @@ public partial class MainWindow : Window
                 return;
             }
 
-            ClipPreviewVideoView.Visibility = Visibility.Visible;
-            ClipPreviewThumbnail.Visibility = Visibility.Collapsed;
             ClipPreviewUnavailableText.Visibility = Visibility.Collapsed;
 
             AppLogger.Write(
@@ -511,12 +516,41 @@ public partial class MainWindow : Window
         }));
     }
 
+    private void ClipPreviewPlayer_TimeChanged(object? sender, MediaPlayerTimeChangedEventArgs e)
+    {
+        if (!_clipPreviewRevealPending || e.Time <= 0)
+            return;
+
+        _clipPreviewRevealPending = false;
+        var generation = _clipPreviewRevealGeneration;
+
+        Dispatcher.BeginInvoke(
+            DispatcherPriority.Render,
+            new Action(async () =>
+            {
+                // Give libVLC one render interval after reporting decoded
+                // progress, then atomically replace the thumbnail. Keeping the
+                // native VideoView hidden until this point prevents its
+                // blank HWND from covering the WPF thumbnail during startup.
+                await Task.Delay(70);
+
+                if (generation != _clipPreviewGeneration ||
+                    _clipPreviewCard?.IsMouseOver != true ||
+                    !ClipPreviewPopup.IsOpen)
+                    return;
+
+                ClipPreviewVideoView.Visibility = Visibility.Visible;
+                ClipPreviewThumbnail.Visibility = Visibility.Collapsed;
+            }));
+    }
+
     private void ShowClipPreviewUnavailable()
     {
         try
         {
             StopClipPreviewMediaOnly();
-            ClipPreviewVideoView.Visibility = Visibility.Collapsed;
+            _clipPreviewRevealPending = false;
+            ClipPreviewVideoView.Visibility = Visibility.Hidden;
 
             if (!string.IsNullOrWhiteSpace(_clipPreviewItem?.ThumbnailPath))
             {
@@ -544,7 +578,8 @@ public partial class MainWindow : Window
             _clipPreviewDelayTimer.Stop();
             StopClipPreviewMediaOnly();
 
-            ClipPreviewVideoView.Visibility = Visibility.Collapsed;
+            _clipPreviewRevealPending = false;
+            ClipPreviewVideoView.Visibility = Visibility.Hidden;
             ClipPreviewThumbnail.Visibility = Visibility.Visible;
             ClipPreviewUnavailableText.Visibility = Visibility.Collapsed;
 
