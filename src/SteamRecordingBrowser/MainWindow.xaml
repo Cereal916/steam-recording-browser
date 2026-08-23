@@ -256,8 +256,19 @@
 
                             <Border Background="#0A0C10" CornerRadius="6" ClipToBounds="True">
                                 <Grid>
-                                    <Image Source="{Binding ThumbnailPath}" Stretch="UniformToFill"/>
-                                    <TextBlock Text="No Steam thumbnail"
+                                    <Image Source="{Binding DisplayImagePath}">
+                                        <Image.Style>
+                                            <Style TargetType="Image">
+                                                <Setter Property="Stretch" Value="UniformToFill"/>
+                                                <Style.Triggers>
+                                                    <DataTrigger Binding="{Binding ThumbnailPath}" Value="{x:Null}">
+                                                        <Setter Property="Stretch" Value="Uniform"/>
+                                                    </DataTrigger>
+                                                </Style.Triggers>
+                                            </Style>
+                                        </Image.Style>
+                                    </Image>
+                                    <TextBlock Text="No artwork available"
                                                Foreground="#667080"
                                                HorizontalAlignment="Center"
                                                VerticalAlignment="Center">
@@ -265,7 +276,7 @@
                                             <Style TargetType="TextBlock">
                                                 <Setter Property="Visibility" Value="Collapsed"/>
                                                 <Style.Triggers>
-                                                    <DataTrigger Binding="{Binding ThumbnailPath}" Value="{x:Null}">
+                                                    <DataTrigger Binding="{Binding DisplayImagePath}" Value="{x:Null}">
                                                         <Setter Property="Visibility" Value="Visible"/>
                                                     </DataTrigger>
                                                 </Style.Triggers>

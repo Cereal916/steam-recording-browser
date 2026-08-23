@@ -388,7 +388,7 @@ public partial class MainWindow : Window
             ClipPreviewGameName.Text = item.GameName;
             ClipPreviewTime.Text = item.DisplayTime;
 
-            SetClipPreviewThumbnail(item.ThumbnailPath);
+            SetClipPreviewThumbnail(item.DisplayImagePath);
 
             _clipPreviewRevealPending = false;
             ClipPreviewVideoView.Visibility = Visibility.Hidden;
@@ -552,7 +552,7 @@ public partial class MainWindow : Window
             _clipPreviewRevealPending = false;
             ClipPreviewVideoView.Visibility = Visibility.Hidden;
 
-            if (!string.IsNullOrWhiteSpace(_clipPreviewItem?.ThumbnailPath))
+            if (!string.IsNullOrWhiteSpace(_clipPreviewItem?.DisplayImagePath))
             {
                 // Preserve the useful static fallback instead of replacing a
                 // good Steam thumbnail with an error message.

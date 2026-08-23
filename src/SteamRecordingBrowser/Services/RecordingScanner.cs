@@ -103,7 +103,8 @@ public sealed class RecordingScanner
             Timestamp = timestamp,
             SizeBytes = size,
             DurationSeconds = _dash.GetDurationSeconds(mpdPath),
-            ThumbnailPath = FindSteamThumbnail(mpdPath)
+            ThumbnailPath = FindSteamThumbnail(mpdPath),
+            CoverArtPath = _steam.FindCachedCoverArt(gameId)
         };
     }
 

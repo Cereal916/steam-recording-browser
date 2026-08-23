@@ -6,6 +6,8 @@ namespace SteamRecordingBrowser.Services;
 
 public sealed class SteamService
 {
+    private readonly Dictionary<string, string?> _coverArtCache = new(StringComparer.OrdinalIgnoreCase);
+
     public string? FindDefaultRecordingRoot()
     {
         var install = GetSteamInstallPath();
@@ -100,6 +102,74 @@ public sealed class SteamService
         AppLogger.Write($"Resolved {map.Count} Steam app names.");
         return map;
     }
+
+    public string? FindCachedCoverArt(string appId)
+    {
+        if (string.IsNullOrWhiteSpace(appId))
+            return null;
+
+        if (_coverArtCache.TryGetValue(appId, out var cached))
+            return cached;
+
+        string? result = null;
+
+        try
+        {
+            var install = GetSteamInstallPath();
+            if (install is null)
+                return CacheResult();
+
+            var libraryCache = Path.Combine(install, "appcache", "librarycache");
+            if (!Directory.Exists(libraryCache))
+                return CacheResult();
+
+            // Support both Steam's current per-app/hash layout and its older
+            // flat cache naming convention. Prefer portrait library artwork,
+            // then fall back to a horizontal library header.
+            var appDirectory = Path.Combine(libraryCache, appId);
+            if (Directory.Exists(appDirectory))
+            {
+                result = FindArtwork(appDirectory, "library_600x900")
+                         ?? FindArtwork(appDirectory, "library_header");
+            }
+
+            result ??= FindExistingFile(
+                Path.Combine(libraryCache, $"{appId}_library_600x900.jpg"),
+                Path.Combine(libraryCache, $"{appId}_library_600x900.png"),
+                Path.Combine(libraryCache, $"{appId}_library_header.jpg"),
+                Path.Combine(libraryCache, $"{appId}_header.jpg"));
+        }
+        catch (Exception ex)
+        {
+            AppLogger.Write($"Could not resolve cached cover art for app {appId}: {ex.Message}", "WARN");
+        }
+
+        return CacheResult();
+
+        string? CacheResult()
+        {
+            _coverArtCache[appId] = result;
+            return result;
+        }
+    }
+
+    private static string? FindArtwork(string root, string fileNameWithoutExtension)
+    {
+        foreach (var extension in new[] { ".jpg", ".png", ".webp" })
+        {
+            var match = Directory
+                .EnumerateFiles(root, fileNameWithoutExtension + extension, SearchOption.AllDirectories)
+                .FirstOrDefault();
+
+            if (match is not null)
+                return match;
+        }
+
+        return null;
+    }
+
+    private static string? FindExistingFile(params string[] paths) =>
+        paths.FirstOrDefault(File.Exists);
 
     private IEnumerable<string> GetLibraryPaths()
     {

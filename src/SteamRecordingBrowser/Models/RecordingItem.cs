@@ -17,6 +17,8 @@ public sealed class RecordingItem : INotifyPropertyChanged
     public required long SizeBytes { get; init; }
     public required double DurationSeconds { get; init; }
     public string? ThumbnailPath { get; init; }
+    public string? CoverArtPath { get; init; }
+    public string? DisplayImagePath => ThumbnailPath ?? CoverArtPath;
 
     public string DisplayTime => Timestamp.ToString("MMM d, yyyy  h:mm:ss tt");
     public string DurationText => DurationSeconds > 0 ? FormatDuration(DurationSeconds) : "—";
