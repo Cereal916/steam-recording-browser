@@ -3,6 +3,11 @@ using System.Windows.Input;
 using System.Windows.Threading;
 using System.Windows.Interop;
 using System.Runtime.InteropServices;
+using System.Globalization;
+using System.Windows.Controls;
+using System.Windows.Shapes;
+using MediaColor = System.Windows.Media.Color;
+using SolidColorBrush = System.Windows.Media.SolidColorBrush;
 using Microsoft.Win32;
 using LibVLCSharp.Shared;
 using SteamRecordingBrowser.Services;
@@ -68,6 +73,9 @@ public partial class PlayerWindow : Window
     private bool _resumeAfterScrub;
     private bool _internalTimelineChange;
     private bool _scrubbing;
+    private bool _fineScrubbing;
+    private long _fineScrubAnchorMs;
+    private double _fineScrubAnchorMouseX;
     private bool _scrubPausePending;
     private bool _scrubReleasePending;
     private double _pendingScrubPosition;
@@ -81,6 +89,13 @@ private readonly DispatcherTimer _hoverFramePauseTimer;
     private LowLevelKeyboardProc? _keyboardHookProc;
 
     private bool _spaceKeyDown;
+
+    private long _timelineTicksLength = -1;
+    private double _timelineTicksWidth = -1;
+
+    private const long LongVideoThresholdMs = 60 * 60 * 1000;
+    private const long LongVideoPreviewSegmentMs = 3_000;
+    private const long FineScrubHalfWindowMs = 2 * 60 * 1000;
 
     private const int WhKeyboardLl = 13;
     private const int WhMouseLl = 14;
@@ -234,6 +249,8 @@ private readonly DispatcherTimer _hoverFramePauseTimer;
         var length = Math.Max(0, _player.Length);
         var reportedTime = Math.Max(0, _player.Time);
         var now = System.Diagnostics.Stopwatch.GetTimestamp();
+
+        UpdateTimelineTicks(length);
 
         if (!_displayClockInitialized)
             ResetDisplayClock(reportedTime, now);
@@ -957,6 +974,68 @@ private readonly DispatcherTimer _hoverFramePauseTimer;
         TogglePlayback("Play/Pause button");
     }
 
+    private void SeekButton_Click(object sender, RoutedEventArgs e)
+    {
+        if (sender is Button { Tag: string value } &&
+            long.TryParse(value, NumberStyles.Integer, CultureInfo.InvariantCulture, out var deltaMs))
+        {
+            SeekRelative(deltaMs);
+        }
+    }
+
+    private void ExactTime_Click(object sender, RoutedEventArgs e)
+    {
+        if (_player.Length <= 0)
+            return;
+
+        var current = Math.Clamp(Math.Max(0, _player.Time), 0, _player.Length);
+        ExactTimeBox.Text = FormatMs(current);
+        TimestampValidationText.Visibility = Visibility.Collapsed;
+        ExactTimeBox.BorderBrush = new SolidColorBrush(MediaColor.FromRgb(70, 85, 107));
+        ExactTimePopup.IsOpen = true;
+
+        Dispatcher.BeginInvoke(new Action(() =>
+        {
+            ExactTimeBox.Focus();
+            ExactTimeBox.SelectAll();
+        }), DispatcherPriority.Input);
+    }
+
+    private void ApplyExactTime_Click(object sender, RoutedEventArgs e) => ApplyExactTimestamp();
+
+    private void ExactTimeBox_KeyDown(object sender, KeyEventArgs e)
+    {
+        if (e.Key == Key.Enter)
+        {
+            ApplyExactTimestamp();
+            e.Handled = true;
+        }
+        else if (e.Key == Key.Escape)
+        {
+            ExactTimePopup.IsOpen = false;
+            TimeButton.Focus();
+            e.Handled = true;
+        }
+    }
+
+    private void ApplyExactTimestamp()
+    {
+        if (!TryParseTimestamp(ExactTimeBox.Text, out var targetMs))
+        {
+            TimestampValidationText.Text = "Use seconds, MM:SS, or HH:MM:SS.";
+            TimestampValidationText.Visibility = Visibility.Visible;
+            ExactTimeBox.BorderBrush = new SolidColorBrush(MediaColor.FromRgb(220, 84, 84));
+            ExactTimeBox.Focus();
+            ExactTimeBox.SelectAll();
+            return;
+        }
+
+        targetMs = Math.Clamp(targetMs, 0, _player.Length);
+        ExactTimePopup.IsOpen = false;
+        SeekToNormalizedPosition(targetMs / (double)_player.Length);
+        TimeButton.Focus();
+    }
+
     private void Timeline_PreviewMouseDown(object sender, MouseButtonEventArgs e)
     {
         if (e.ChangedButton != MouseButton.Left)
@@ -964,6 +1043,9 @@ private readonly DispatcherTimer _hoverFramePauseTimer;
 
         _dragging = true;
         _scrubbing = true;
+        _fineScrubbing = Keyboard.Modifiers.HasFlag(ModifierKeys.Shift);
+        _fineScrubAnchorMs = Math.Clamp(Math.Max(0, _player.Time), 0, Math.Max(0, _player.Length));
+        _fineScrubAnchorMouseX = e.GetPosition(Timeline).X;
         _scrubReleasePending = false;
         _scrubPausePending = false;
         _resumeAfterScrub = _player.IsPlaying;
@@ -987,7 +1069,7 @@ private readonly DispatcherTimer _hoverFramePauseTimer;
         Timeline.CaptureMouse();
         _scrubPauseWatchdogTimer.Start();
 
-        var normalized = GetNormalizedMousePosition(e);
+        var normalized = GetScrubNormalizedPosition(e);
         _pendingScrubPosition = normalized;
 
         _internalTimelineChange = true;
@@ -1020,7 +1102,7 @@ private readonly DispatcherTimer _hoverFramePauseTimer;
         if (e.ChangedButton != MouseButton.Left || !_scrubbing)
             return;
 
-        var target = GetNormalizedMousePosition(e);
+        var target = GetScrubNormalizedPosition(e);
         var targetMs = NormalizedToMs(target);
         var resume = _resumeAfterScrub;
 
@@ -1035,6 +1117,7 @@ private readonly DispatcherTimer _hoverFramePauseTimer;
 
         _dragging = false;
         _scrubbing = false;
+        _fineScrubbing = false;
         _scrubFrameTimer.Stop();
         _scrubHoldFreezeTimer.Stop();
         _scrubPauseWatchdogTimer.Stop();
@@ -1131,7 +1214,14 @@ private readonly DispatcherTimer _hoverFramePauseTimer;
         if (length <= 0)
             return;
 
-        var targetMs = NormalizedToMs(_pendingScrubPosition);
+        var exactTargetMs = NormalizedToMs(_pendingScrubPosition);
+        var longVideo = length > LongVideoThresholdMs;
+        var targetMs = longVideo
+            ? Math.Clamp(
+                (long)Math.Round(exactTargetMs / (double)LongVideoPreviewSegmentMs) * LongVideoPreviewSegmentMs,
+                0,
+                length)
+            : exactTargetMs;
         var now = System.Diagnostics.Stopwatch.GetTimestamp();
 
         var elapsedSinceIssueMs = _lastScrubIssueTimestamp == 0
@@ -1148,15 +1238,16 @@ private readonly DispatcherTimer _hoverFramePauseTimer;
         // The player is actively decoding while scrubbing. Aim for about
         // 30 visible updates/sec when it is keeping up, and reduce pressure
         // if fragmented-DASH seeking begins to lag.
-        var minimumIssueIntervalMs =
-            distanceFromPreviousRequest <= 350 ? 33d : 70d;
+        var minimumIssueIntervalMs = longVideo
+            ? 120d
+            : distanceFromPreviousRequest <= 350 ? 33d : 70d;
 
         if (!force && elapsedSinceIssueMs < minimumIssueIntervalMs)
             return;
 
         if (!force &&
             _lastIssuedScrubTargetMs >= 0 &&
-            Math.Abs(targetMs - _lastIssuedScrubTargetMs) < 16)
+            Math.Abs(targetMs - _lastIssuedScrubTargetMs) < (longVideo ? LongVideoPreviewSegmentMs : 16))
         {
             _scrubTargetDirty = false;
             return;
@@ -1189,8 +1280,8 @@ private readonly DispatcherTimer _hoverFramePauseTimer;
             _scrubHoldFreezeTimer.Stop();
             _scrubHoldFreezeTimer.Start();
 
-            _displayTimeMs = targetMs;
-            TimeLabel.Text = $"{FormatMs(targetMs)} / {FormatMs(length)}";
+            _displayTimeMs = exactTargetMs;
+            TimeLabel.Text = $"{FormatMs(exactTargetMs)} / {FormatMs(length)}";
 
             LogMainScrubLag(targetMs, actualMs, now);
         }
@@ -1341,7 +1432,7 @@ private readonly DispatcherTimer _hoverFramePauseTimer;
     {
         if (_scrubbing && e.LeftButton == MouseButtonState.Pressed)
         {
-            var normalized = GetNormalizedMousePosition(e);
+            var normalized = GetScrubNormalizedPosition(e);
 
             _internalTimelineChange = true;
             Timeline.Value = normalized;
@@ -1732,6 +1823,19 @@ private readonly DispatcherTimer _hoverFramePauseTimer;
         return Math.Clamp(point.X / Timeline.ActualWidth, 0d, 1d);
     }
 
+    private double GetScrubNormalizedPosition(MouseEventArgs e)
+    {
+        if (!_fineScrubbing || Timeline.ActualWidth <= 0 || _player.Length <= 0)
+            return GetNormalizedMousePosition(e);
+
+        var mouseX = e.GetPosition(Timeline).X;
+        var halfWidth = Math.Max(1d, Timeline.ActualWidth / 2d);
+        var offsetMs = (long)Math.Round(
+            (mouseX - _fineScrubAnchorMouseX) / halfWidth * FineScrubHalfWindowMs);
+        var targetMs = Math.Clamp(_fineScrubAnchorMs + offsetMs, 0, _player.Length);
+        return targetMs / (double)_player.Length;
+    }
+
     private void SeekToNormalizedPosition(double normalized)
     {
         normalized = Math.Clamp(normalized, 0d, 1d);
@@ -1860,13 +1964,49 @@ private readonly DispatcherTimer _hoverFramePauseTimer;
 
     private void UpdateMetadataDisplay()
     {
-        DescriptionText.Text = string.IsNullOrWhiteSpace(_item.Description)
-            ? "No description"
-            : _item.Description.Trim();
+        var hasDescription = !string.IsNullOrWhiteSpace(_item.Description);
+        DescriptionText.Text = hasDescription
+            ? _item.Description.Trim()
+            : "Add a description to remember what happened in this recording.";
+        DescriptionText.Foreground = new SolidColorBrush(hasDescription
+            ? MediaColor.FromRgb(230, 234, 240)
+            : MediaColor.FromRgb(111, 122, 138));
 
-        TagsText.Text = _item.Tags is { Count: > 0 }
-            ? string.Join(", ", _item.Tags)
-            : "No tags";
+        TagsPanel.Children.Clear();
+
+        if (_item.Tags is not { Count: > 0 })
+        {
+            TagsPanel.Children.Add(new TextBlock
+            {
+                Text = "Add tags to make this recording easier to find.",
+                Foreground = new SolidColorBrush(MediaColor.FromRgb(111, 122, 138)),
+                FontSize = 12,
+                Margin = new Thickness(0, 3, 0, 0)
+            });
+            return;
+        }
+
+        foreach (var tag in _item.Tags)
+        {
+            var chip = new Border
+            {
+                Background = new SolidColorBrush(MediaColor.FromRgb(25, 42, 57)),
+                BorderBrush = new SolidColorBrush(MediaColor.FromRgb(52, 79, 101)),
+                BorderThickness = new Thickness(1),
+                CornerRadius = new CornerRadius(11),
+                Padding = new Thickness(9, 3, 9, 3),
+                Margin = new Thickness(0, 0, 6, 6),
+                Child = new TextBlock
+                {
+                    Text = tag,
+                    Foreground = new SolidColorBrush(MediaColor.FromRgb(141, 212, 255)),
+                    FontSize = 11,
+                    FontWeight = FontWeights.SemiBold
+                }
+            };
+
+            TagsPanel.Children.Add(chip);
+        }
     }
 
     private void Favorite_Click(object sender, RoutedEventArgs e)
@@ -1978,6 +2118,116 @@ private readonly DispatcherTimer _hoverFramePauseTimer;
             value = value.Replace(c, '_');
 
         return value.Trim();
+    }
+
+    private void TimelineTickCanvas_SizeChanged(object sender, SizeChangedEventArgs e)
+    {
+        _timelineTicksWidth = -1;
+        UpdateTimelineTicks(Math.Max(0, _player.Length));
+    }
+
+    private void UpdateTimelineTicks(long lengthMs)
+    {
+        var width = TimelineTickCanvas.ActualWidth;
+        if (lengthMs <= 0 || width <= 0)
+            return;
+
+        if (_timelineTicksLength == lengthMs && Math.Abs(_timelineTicksWidth - width) < 0.5)
+            return;
+
+        _timelineTicksLength = lengthMs;
+        _timelineTicksWidth = width;
+        Timeline.SmallChange = Math.Min(1d, 5_000d / lengthMs);
+        Timeline.LargeChange = Math.Min(1d, 30_000d / lengthMs);
+        TimelineTickCanvas.Children.Clear();
+
+        var intervalMs = ChooseTimelineTickInterval(lengthMs);
+        var tickTimes = new List<long>();
+        for (long time = 0; time <= lengthMs; time += intervalMs)
+            tickTimes.Add(time);
+
+        if (tickTimes.Count == 0 || tickTimes[^1] != lengthMs)
+            tickTimes.Add(lengthMs);
+
+        var tickBrush = new SolidColorBrush(MediaColor.FromRgb(74, 89, 110));
+        var labelBrush = new SolidColorBrush(MediaColor.FromRgb(152, 162, 179));
+
+        foreach (var time in tickTimes)
+        {
+            var x = time / (double)lengthMs * width;
+            var tick = new Line
+            {
+                X1 = x,
+                X2 = x,
+                Y1 = 0,
+                Y2 = 4,
+                Stroke = tickBrush,
+                StrokeThickness = 1
+            };
+            TimelineTickCanvas.Children.Add(tick);
+
+            var label = new TextBlock
+            {
+                Text = FormatMs(time),
+                Foreground = labelBrush,
+                FontSize = 10
+            };
+            label.Measure(new Size(double.PositiveInfinity, double.PositiveInfinity));
+            Canvas.SetLeft(label, Math.Clamp(x - label.DesiredSize.Width / 2d, 0, Math.Max(0, width - label.DesiredSize.Width)));
+            Canvas.SetTop(label, 4);
+            TimelineTickCanvas.Children.Add(label);
+        }
+    }
+
+    private static long ChooseTimelineTickInterval(long lengthMs)
+    {
+        long[] intervals =
+        [
+            5_000, 10_000, 15_000, 30_000,
+            60_000, 2 * 60_000, 5 * 60_000, 10 * 60_000,
+            15 * 60_000, 30 * 60_000, 60 * 60_000
+        ];
+
+        var desired = lengthMs / 12d;
+        return intervals.FirstOrDefault(interval => interval >= desired, intervals[^1]);
+    }
+
+    private static bool TryParseTimestamp(string value, out long milliseconds)
+    {
+        milliseconds = 0;
+        var parts = value.Trim().Split(':', StringSplitOptions.TrimEntries);
+        if (parts.Length is < 1 or > 3 ||
+            parts.Any(part => !long.TryParse(part, NumberStyles.None, CultureInfo.InvariantCulture, out _)))
+        {
+            return false;
+        }
+
+        var numbers = parts
+            .Select(part => long.Parse(part, NumberStyles.None, CultureInfo.InvariantCulture))
+            .ToArray();
+
+        long totalSeconds;
+        try
+        {
+            totalSeconds = numbers.Length switch
+            {
+                1 => numbers[0],
+                2 when numbers[1] < 60 => checked(numbers[0] * 60 + numbers[1]),
+                3 when numbers[1] < 60 && numbers[2] < 60 =>
+                    checked(numbers[0] * 3600 + numbers[1] * 60 + numbers[2]),
+                _ => -1
+            };
+
+            if (totalSeconds < 0)
+                return false;
+
+            milliseconds = checked(totalSeconds * 1000);
+            return true;
+        }
+        catch (OverflowException)
+        {
+            return false;
+        }
     }
 
     private static string FormatMs(long ms)

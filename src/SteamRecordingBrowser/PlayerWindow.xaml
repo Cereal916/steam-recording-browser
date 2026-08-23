@@ -48,6 +48,17 @@
                 </Setter.Value>
             </Setter>
         </Style>
+        <Style x:Key="TimestampTextBox" TargetType="TextBox">
+            <Setter Property="Foreground" Value="#F4F7FB"/>
+            <Setter Property="Background" Value="#0B0E13"/>
+            <Setter Property="BorderBrush" Value="#46556B"/>
+            <Setter Property="BorderThickness" Value="1"/>
+            <Setter Property="Padding" Value="10,6"/>
+            <Setter Property="FontSize" Value="15"/>
+            <Setter Property="FontWeight" Value="SemiBold"/>
+            <Setter Property="TextAlignment" Value="Center"/>
+            <Setter Property="CaretBrush" Value="#66C0F4"/>
+        </Style>
         <Style x:Key="DarkVolumeSlider" TargetType="Slider">
             <Setter Property="Height" Value="24"/>
             <Setter Property="Focusable" Value="True"/>
@@ -190,22 +201,27 @@
 
         <Grid Grid.Row="1" Background="#151922">
             <Grid.RowDefinitions>
-                <RowDefinition Height="66"/>
+                <RowDefinition Height="116"/>
                 <RowDefinition Height="54"/>
                 <RowDefinition Height="Auto"/>
             </Grid.RowDefinitions>
 
             <Grid Grid.Row="0">
+                <Grid.RowDefinitions>
+                    <RowDefinition Height="70"/>
+                    <RowDefinition Height="46"/>
+                </Grid.RowDefinitions>
                 <Grid.ColumnDefinitions>
-                    <ColumnDefinition Width="Auto"/>
                     <ColumnDefinition Width="*"/>
-                    <ColumnDefinition Width="Auto"/>
                     <ColumnDefinition Width="Auto"/>
                 </Grid.ColumnDefinitions>
 
-                <Button x:Name="PlayPauseButton" Content="Pause" Width="82" Height="36" Margin="14,0"
-                        Click="PlayPause_Click"/>
-                <Grid Grid.Column="1" Margin="8,0">
+                <Grid Grid.Row="0" Grid.Column="0" Grid.ColumnSpan="2" Margin="14,2,14,0">
+                    <Grid.RowDefinitions>
+                        <RowDefinition Height="30"/>
+                        <RowDefinition Height="18"/>
+                        <RowDefinition Height="22"/>
+                    </Grid.RowDefinitions>
                     <Slider x:Name="Timeline"
                             Style="{StaticResource DarkTimelineSlider}"
                             Minimum="0" Maximum="1"
@@ -218,7 +234,29 @@
                             MouseLeave="Timeline_MouseLeave"
                             ValueChanged="Timeline_ValueChanged"
                             KeyDown="Timeline_KeyDown"
-                            ToolTip="Click to seek • drag to scrub • hover for frame preview • ←/→ ±5 sec"/>
+                            ToolTip="Click to seek • drag to scrub • Shift+drag for fine control • hover for frame preview"/>
+
+                    <Canvas x:Name="TimelineTickCanvas"
+                            Grid.Row="1"
+                            Height="18"
+                            IsHitTestVisible="False"
+                            SizeChanged="TimelineTickCanvas_SizeChanged"/>
+
+                    <Button x:Name="TimeButton"
+                            Grid.Row="2"
+                            HorizontalAlignment="Center"
+                            Margin="0,1,0,0"
+                            Padding="10,1"
+                            Background="Transparent"
+                            BorderBrush="Transparent"
+                            ToolTip="Go to an exact timestamp"
+                            Click="ExactTime_Click">
+                        <TextBlock x:Name="TimeLabel"
+                                   Foreground="#B8C2D0"
+                                   FontSize="11"
+                                   FontWeight="SemiBold"
+                                   Text="0:00 / 0:00"/>
+                    </Button>
 
                     <Popup x:Name="TimelinePreviewPopup"
                            Placement="Absolute"
@@ -248,14 +286,82 @@
                             </StackPanel>
                         </Border>
                     </Popup>
+                    <Popup x:Name="ExactTimePopup"
+                       PlacementTarget="{Binding ElementName=TimeButton}"
+                       Placement="Bottom"
+                       HorizontalOffset="0"
+                       VerticalOffset="4"
+                       AllowsTransparency="True"
+                       StaysOpen="False">
+                    <Border Width="250"
+                            Padding="12"
+                            Background="#11151C"
+                            BorderBrush="#46556B"
+                            BorderThickness="1"
+                            CornerRadius="7">
+                        <Border.Effect>
+                            <DropShadowEffect Color="#000000"
+                                              BlurRadius="12"
+                                              ShadowDepth="3"
+                                              Opacity="0.65"/>
+                        </Border.Effect>
+                        <StackPanel>
+                            <TextBlock Text="Go to timestamp"
+                                       Foreground="#F4F7FB"
+                                       FontWeight="SemiBold"
+                                       Margin="0,0,0,7"/>
+                            <Grid>
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="*"/>
+                                    <ColumnDefinition Width="Auto"/>
+                                </Grid.ColumnDefinitions>
+                                <TextBox x:Name="ExactTimeBox"
+                                         Style="{StaticResource TimestampTextBox}"
+                                         ToolTip="Seconds, MM:SS, or HH:MM:SS"
+                                         KeyDown="ExactTimeBox_KeyDown"/>
+                                <Button Grid.Column="1"
+                                        Content="Go"
+                                        Width="48"
+                                        Margin="8,0,0,0"
+                                        Click="ApplyExactTime_Click"/>
+                            </Grid>
+                            <TextBlock x:Name="TimestampValidationText"
+                                       Foreground="#FF8A8A"
+                                       FontSize="11"
+                                       Margin="1,6,0,0"
+                                       Visibility="Collapsed"/>
+                            <TextBlock Text="Enter to seek  •  Esc to close"
+                                       Foreground="#7F8998"
+                                       FontSize="10"
+                                       Margin="1,6,0,0"/>
+                        </StackPanel>
+                    </Border>
+                    </Popup>
                 </Grid>
-                <TextBlock x:Name="TimeLabel"
-                           Grid.Column="2"
-                           VerticalAlignment="Center"
-                           Margin="14,0"
-                           Foreground="#D5DBE5"
-                           Text="0:00 / 0:00"/>
-                <Border Grid.Column="3"
+
+                <StackPanel Grid.Row="1"
+                            Grid.Column="0"
+                            Orientation="Horizontal"
+                            VerticalAlignment="Center"
+                            Margin="14,0,8,4">
+                    <Button x:Name="PlayPauseButton"
+                            Content="Pause"
+                            Width="82"
+                            Height="34"
+                            Margin="0,0,12,0"
+                            Click="PlayPause_Click"/>
+                    <Button Content="−30s" Width="54" Height="32" Padding="6,4" Margin="0,0,6,0"
+                            Tag="-30000" ToolTip="Back 30 seconds" Click="SeekButton_Click"/>
+                    <Button Content="−5s" Width="46" Height="32" Padding="6,4" Margin="0,0,6,0"
+                            Tag="-5000" ToolTip="Back 5 seconds" Click="SeekButton_Click"/>
+                    <Button Content="+5s" Width="46" Height="32" Padding="6,4" Margin="0,0,6,0"
+                            Tag="5000" ToolTip="Forward 5 seconds" Click="SeekButton_Click"/>
+                    <Button Content="+30s" Width="54" Height="32" Padding="6,4"
+                            Tag="30000" ToolTip="Forward 30 seconds" Click="SeekButton_Click"/>
+                </StackPanel>
+
+                <Border Grid.Row="1"
+                        Grid.Column="1"
                         Margin="0,0,14,0"
                         Padding="5,4,8,4"
                         VerticalAlignment="Center"
@@ -310,14 +416,6 @@
                                 Margin="0,0,8,0"
                                 Padding="12,6"
                                 Click="Favorite_Click"/>
-                        <Button Content="Description…"
-                                Margin="0,0,8,0"
-                                Padding="12,6"
-                                Click="Description_Click"/>
-                        <Button Content="Tags…"
-                                Margin="0,0,8,0"
-                                Padding="12,6"
-                                Click="Tags_Click"/>
                         <Button Content="Export MP4…"
                                 Padding="12,6"
                                 Click="Export_Click"/>
@@ -329,38 +427,78 @@
                     BorderBrush="#2B3240"
                     BorderThickness="0,1,0,0"
                     Background="#11151C"
-                    Padding="14,10">
+                    Padding="14,12">
                 <Grid>
                     <Grid.ColumnDefinitions>
                         <ColumnDefinition Width="*"/>
                         <ColumnDefinition Width="*"/>
                     </Grid.ColumnDefinitions>
 
-                    <StackPanel Grid.Column="0" Margin="0,0,18,0">
-                        <TextBlock Text="Description"
-                                   Foreground="#98A2B3"
-                                   FontSize="11"
-                                   FontWeight="SemiBold"
-                                   Margin="0,0,0,3"/>
-                        <TextBlock x:Name="DescriptionText"
-                                   Foreground="#E6EAF0"
-                                   TextWrapping="Wrap"
-                                   MaxHeight="54"
-                                   ToolTip="{Binding Text, RelativeSource={RelativeSource Self}}"/>
-                    </StackPanel>
+                    <Border Grid.Column="0"
+                            Margin="0,0,9,0"
+                            Padding="12,10"
+                            Background="#0C1016"
+                            BorderBrush="#2B3442"
+                            BorderThickness="1"
+                            CornerRadius="8">
+                        <StackPanel>
+                            <DockPanel Margin="0,0,0,7">
+                                <Button DockPanel.Dock="Right"
+                                        Content="Edit"
+                                        Padding="9,3"
+                                        FontSize="11"
+                                        Click="Description_Click"/>
+                                <Border DockPanel.Dock="Left"
+                                        Width="3"
+                                        Height="14"
+                                        Margin="0,0,7,0"
+                                        Background="#66C0F4"
+                                        CornerRadius="2"/>
+                                <TextBlock Text="DESCRIPTION"
+                                           VerticalAlignment="Center"
+                                           Foreground="#98A2B3"
+                                           FontSize="10"
+                                           FontWeight="Bold"/>
+                            </DockPanel>
+                            <TextBlock x:Name="DescriptionText"
+                                       Foreground="#E6EAF0"
+                                       FontSize="13"
+                                       LineHeight="19"
+                                       TextWrapping="Wrap"
+                                       MaxHeight="58"
+                                       ToolTip="{Binding Text, RelativeSource={RelativeSource Self}}"/>
+                        </StackPanel>
+                    </Border>
 
-                    <StackPanel Grid.Column="1">
-                        <TextBlock Text="Tags"
-                                   Foreground="#98A2B3"
-                                   FontSize="11"
-                                   FontWeight="SemiBold"
-                                   Margin="0,0,0,3"/>
-                        <TextBlock x:Name="TagsText"
-                                   Foreground="#E6EAF0"
-                                   TextWrapping="Wrap"
-                                   MaxHeight="54"
-                                   ToolTip="{Binding Text, RelativeSource={RelativeSource Self}}"/>
-                    </StackPanel>
+                    <Border Grid.Column="1"
+                            Margin="9,0,0,0"
+                            Padding="12,10"
+                            Background="#0C1016"
+                            BorderBrush="#2B3442"
+                            BorderThickness="1"
+                            CornerRadius="8">
+                        <StackPanel>
+                            <DockPanel Margin="0,0,0,7">
+                                <Button DockPanel.Dock="Right"
+                                        Content="Edit"
+                                        Padding="9,3"
+                                        FontSize="11"
+                                        Click="Tags_Click"/>
+                                <Border DockPanel.Dock="Left"
+                                        Width="3"
+                                        Height="14"
+                                        Margin="0,0,7,0"
+                                        Background="#66C0F4"
+                                        CornerRadius="2"/>
+                                <TextBlock Text="TAGS"
+                                           VerticalAlignment="Center"
+                                           Foreground="#98A2B3"
+                                           FontSize="10"
+                                           FontWeight="Bold"/>
+                            </DockPanel>
+                            <WrapPanel x:Name="TagsPanel"/>
+                        </StackPanel>
+                    </Border>
                 </Grid>
             </Border>
         </Grid>
