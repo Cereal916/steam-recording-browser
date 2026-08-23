@@ -4,15 +4,19 @@ All notable changes to Steam Recording Browser are documented here.
 
 The project adopts semantic versioning beginning with **1.0.0**.
 
-## Unreleased
+## 1.2.0 - 2026-08-23
 
 ### Added
 
 - Added bundled FFmpeg transcoding for H.264, HEVC, and AV1 exports with
   hardware-encoder fallback, live progress and ETA, cancellation cleanup, and
   ffprobe validation of audio and video streams.
+- Added a dark-themed codec selection window with source-codec details, bitrate
+  and file-size estimates, and consolidated social-platform upload guidance.
 - Added an export option to disable hardware encoding, with software-specific
   bitrate estimates and guidance about speed, CPU use, quality, and compression.
+- Added codec-labeled export filenames and temporary `.incomplete.mp4` names
+  that are promoted to the final filename only after validation succeeds.
 - Added licensing notices, checksum verification, and exact corresponding-source
   metadata for the bundled FFmpeg GPL build.
 
@@ -20,6 +24,16 @@ The project adopts semantic versioning beginning with **1.0.0**.
 
 - Kept Original codec exports on the existing lossless libVLC remux path while
   routing re-encoded exports through FFmpeg.
+- Updated release packaging to acquire and verify the supported FFmpeg build
+  automatically and include its executable, source, and license notices.
+
+### Fixed
+
+- Fixed H.264, HEVC, and AV1 exports producing audio-only MP4 files.
+- Fixed Original exports being validated before libVLC finalized the MP4.
+- Fixed the export progress fill not advancing with its displayed percentage.
+- Fixed cancelled or failed exports leaving partial video files behind.
+- Fixed export-window content and action buttons being clipped.
 
 ## 1.1.2 - 2026-08-22
 
