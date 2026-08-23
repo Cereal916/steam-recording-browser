@@ -17,6 +17,7 @@ Steam Recording Browser.
 - [0002 - Keep Steam recordings immutable](0002-recordings-immutable.md)
 - [0003 - Portable self-contained Windows deployment](0003-portable-self-contained-deployment.md)
 - [0004 - Repository and semantic-version baseline](0004-v1-repository-baseline.md)
+- [0005 - UI consistency and AI-assisted contribution standards](0005-ui-and-ai-contribution-standards.md)
 
 Historical implementation iterations are tracked in `CHANGELOG.md`, not in
 current ADR text.
