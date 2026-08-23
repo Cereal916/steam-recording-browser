@@ -358,6 +358,68 @@
                             Tag="5000" ToolTip="Forward 5 seconds" Click="SeekButton_Click"/>
                     <Button Content="+30s" Width="54" Height="32" Padding="6,4"
                             Tag="30000" ToolTip="Forward 30 seconds" Click="SeekButton_Click"/>
+                    <Border Width="36"
+                            Height="32"
+                            Margin="8,0,0,0"
+                            Background="#10141B"
+                            BorderBrush="#343C49"
+                            BorderThickness="1"
+                            CornerRadius="5"
+                            Cursor="Help"
+                            ToolTipService.InitialShowDelay="200"
+                            ToolTipService.ShowDuration="30000">
+                        <TextBlock Text="⌨"
+                                   HorizontalAlignment="Center"
+                                   VerticalAlignment="Center"
+                                   Foreground="#B8C2D0"
+                                   FontFamily="Segoe UI Symbol"
+                                   FontSize="17"/>
+                        <Border.ToolTip>
+                            <ToolTip Placement="Top"
+                                     HorizontalOffset="0"
+                                     VerticalOffset="-4"
+                                     Background="Transparent"
+                                     BorderThickness="0"
+                                     Padding="0">
+                                <Border Width="270"
+                                        Padding="13,11"
+                                        Background="#0C1016"
+                                        BorderBrush="#46556B"
+                                        BorderThickness="1"
+                                        CornerRadius="7">
+                                    <Border.Effect>
+                                        <DropShadowEffect Color="#000000"
+                                                          BlurRadius="12"
+                                                          ShadowDepth="3"
+                                                          Opacity="0.65"/>
+                                    </Border.Effect>
+                                    <StackPanel>
+                                        <TextBlock Text="Keyboard shortcuts"
+                                                   Foreground="#F4F7FB"
+                                                   FontWeight="SemiBold"
+                                                   Margin="0,0,0,9"/>
+                                        <Grid>
+                                            <Grid.ColumnDefinitions>
+                                                <ColumnDefinition Width="92"/>
+                                                <ColumnDefinition Width="*"/>
+                                            </Grid.ColumnDefinitions>
+                                            <Grid.RowDefinitions>
+                                                <RowDefinition Height="Auto"/>
+                                                <RowDefinition Height="Auto"/>
+                                                <RowDefinition Height="Auto"/>
+                                            </Grid.RowDefinitions>
+                                            <TextBlock Grid.Row="0" Text="Space" Foreground="#8DD4FF" FontWeight="SemiBold"/>
+                                            <TextBlock Grid.Row="0" Grid.Column="1" Text="Play / pause" Foreground="#D5DBE5"/>
+                                            <TextBlock Grid.Row="1" Text="Shift + drag" Foreground="#8DD4FF" FontWeight="SemiBold" Margin="0,5,0,0"/>
+                                            <TextBlock Grid.Row="1" Grid.Column="1" Text="Fine timeline scrub" Foreground="#D5DBE5" Margin="0,5,0,0"/>
+                                            <TextBlock Grid.Row="2" Text="Mouse wheel" Foreground="#8DD4FF" FontWeight="SemiBold" Margin="0,5,0,0"/>
+                                            <TextBlock Grid.Row="2" Grid.Column="1" Text="Seek 5 seconds" Foreground="#D5DBE5" Margin="0,5,0,0"/>
+                                        </Grid>
+                                    </StackPanel>
+                                </Border>
+                            </ToolTip>
+                        </Border.ToolTip>
+                    </Border>
                 </StackPanel>
 
                 <Border Grid.Row="1"
