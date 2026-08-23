@@ -3,9 +3,8 @@
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
         Title="Export options"
         Width="650"
+        Height="890"
         MinWidth="600"
-        MaxHeight="850"
-        SizeToContent="Height"
         WindowStartupLocation="CenterOwner"
         ResizeMode="NoResize"
         Background="#0D1015"
@@ -40,7 +39,7 @@
                 <StackPanel>
                     <TextBlock Text="H.264" FontWeight="SemiBold" FontSize="15"/>
                     <TextBlock Text="Best for social uploads" Foreground="#66C0F4" Margin="0,5,0,0"/>
-                    <TextBlock Text="12 Mbps video + 192 Kbps AAC" Foreground="#98A2B3" Margin="0,5,0,0"/>
+                    <TextBlock x:Name="H264BitrateText" Text="12 Mbps video + 192 Kbps AAC" Foreground="#98A2B3" Margin="0,5,0,0"/>
                     <TextBlock x:Name="H264SizeText" Foreground="#D5DBE5" Margin="0,5,0,0" FontWeight="SemiBold"/>
                 </StackPanel>
             </Button>
@@ -48,7 +47,7 @@
                 <StackPanel>
                     <TextBlock Text="HEVC / H.265" FontWeight="SemiBold" FontSize="15"/>
                     <TextBlock Text="Smaller files • slower" Foreground="#98A2B3" Margin="0,5,0,0"/>
-                    <TextBlock Text="8 Mbps video + 192 Kbps AAC" Foreground="#66C0F4" Margin="0,5,0,0"/>
+                    <TextBlock x:Name="HevcBitrateText" Text="8 Mbps video + 192 Kbps AAC" Foreground="#66C0F4" Margin="0,5,0,0"/>
                     <TextBlock x:Name="HevcSizeText" Foreground="#D5DBE5" Margin="0,5,0,0" FontWeight="SemiBold"/>
                 </StackPanel>
             </Button>
@@ -56,7 +55,7 @@
                 <StackPanel>
                     <TextBlock Text="AV1" FontWeight="SemiBold" FontSize="15"/>
                     <TextBlock Text="Smallest files • slowest" Foreground="#98A2B3" Margin="0,5,0,0"/>
-                    <TextBlock Text="6 Mbps video + 192 Kbps AAC" Foreground="#66C0F4" Margin="0,5,0,0"/>
+                    <TextBlock x:Name="Av1BitrateText" Text="6 Mbps video + 192 Kbps AAC" Foreground="#66C0F4" Margin="0,5,0,0"/>
                     <TextBlock x:Name="Av1SizeText" Foreground="#D5DBE5" Margin="0,5,0,0" FontWeight="SemiBold"/>
                 </StackPanel>
             </Button>
@@ -76,6 +75,14 @@
                 <TextBlock x:Name="SelectedCodecText" FontWeight="SemiBold" Foreground="#66C0F4"/>
                 <TextBlock x:Name="CodecHintText" Margin="0,7,0,0" Foreground="#D5DBE5"
                            TextWrapping="Wrap" LineHeight="19"/>
+                <Border Height="1" Background="#2B3240" Margin="0,14,0,13"/>
+                <CheckBox x:Name="HardwareEncodingCheckBox"
+                          Content="Use hardware encoding when available"
+                          IsChecked="True"
+                          Click="HardwareEncoding_Changed"
+                          FontWeight="SemiBold"/>
+                <TextBlock x:Name="EncodingModeText" Margin="24,7,0,0"
+                           Foreground="#98A2B3" TextWrapping="Wrap" LineHeight="18"/>
             </StackPanel>
         </Border>
 

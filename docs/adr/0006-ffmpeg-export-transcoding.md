@@ -15,7 +15,9 @@ reported.
 
 - Keep libVLC for playback and Original codec remux exports.
 - Invoke FFmpeg as a separate executable for H.264, HEVC, and AV1 exports.
-- Prefer compatible hardware encoders and fall back to software encoders.
+- Prefer compatible hardware encoders and fall back to software encoders by
+  default, while allowing users to require software encoding for better
+  compression efficiency and consistent CPU-based output.
 - Report percentage, speed, and ETA; cancellation terminates the process tree
   and removes the partial output.
 - Verify every completed export with ffprobe and require both video and audio
@@ -35,4 +37,3 @@ Codec exports are reliable and independently validated, but portable releases
 are substantially larger. FFmpeg and its dependencies remain under their own
 licenses and are not relicensed under the application's MIT license. Release
 maintainers must preserve the acquisition, checksum, source, and notice files.
-

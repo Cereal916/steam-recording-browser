@@ -8,8 +8,10 @@ namespace SteamRecordingBrowser;
 public partial class ExportOptionsWindow : Window
 {
     private readonly VideoCodecInfo _sourceCodec;
+    private readonly double _durationSeconds;
 
     public ExportVideoCodec SelectedCodec { get; private set; } = ExportVideoCodec.Original;
+    public bool UseHardwareEncoding => HardwareEncodingCheckBox.IsChecked == true;
     public string SelectedCodecFileLabel => SelectedCodec == ExportVideoCodec.Original
         ? $"{_sourceCodec.ExportCodec?.FileNameLabel() ?? _sourceCodec.DisplayName} Orig"
         : SelectedCodec.FileNameLabel();
@@ -17,13 +19,12 @@ public partial class ExportOptionsWindow : Window
     public ExportOptionsWindow(VideoCodecInfo sourceCodec, double durationSeconds, long sourceSizeBytes)
     {
         _sourceCodec = sourceCodec;
+        _durationSeconds = durationSeconds;
         InitializeComponent();
         OriginalCodecText.Text = $"Current: {sourceCodec.DisplayName} • no quality loss";
         OriginalBitrateText.Text = $"Approx. source bitrate: {FormatSourceBitrate(durationSeconds, sourceSizeBytes)}";
         OriginalSizeText.Text = $"Estimated: {RecordingItem.FormatBytes(Math.Max(0, sourceSizeBytes))}";
-        H264SizeText.Text = $"Estimated: {FormatTranscodedSize(durationSeconds, 12_000)}";
-        HevcSizeText.Text = $"Estimated: {FormatTranscodedSize(durationSeconds, 8_000)}";
-        Av1SizeText.Text = $"Estimated: {FormatTranscodedSize(durationSeconds, 6_000)}";
+        UpdateEncodingMode();
         ApplyFfmpegAvailability();
         UpdateSelection();
     }
@@ -71,6 +72,29 @@ public partial class ExportOptionsWindow : Window
         }
     }
 
+    private void HardwareEncoding_Changed(object sender, RoutedEventArgs e) => UpdateEncodingMode();
+
+    private void UpdateEncodingMode()
+    {
+        if (!IsInitialized)
+            return;
+
+        var hardware = UseHardwareEncoding;
+        var h264Kbps = hardware ? 12_000 : 10_000;
+        var hevcKbps = hardware ? 8_000 : 7_000;
+        var av1Kbps = hardware ? 6_000 : 5_000;
+
+        H264BitrateText.Text = $"{h264Kbps / 1000} Mbps video + 192 Kbps AAC";
+        HevcBitrateText.Text = $"{hevcKbps / 1000} Mbps video + 192 Kbps AAC";
+        Av1BitrateText.Text = $"{av1Kbps / 1000} Mbps video + 192 Kbps AAC";
+        H264SizeText.Text = $"Estimated: {FormatTranscodedSize(_durationSeconds, h264Kbps)}";
+        HevcSizeText.Text = $"Estimated: {FormatTranscodedSize(_durationSeconds, hevcKbps)}";
+        Av1SizeText.Text = $"Estimated: {FormatTranscodedSize(_durationSeconds, av1Kbps)}";
+        EncodingModeText.Text = hardware
+            ? "Faster and uses less CPU. The app tries your GPU first and automatically falls back to software if needed. Hardware encoding can produce a somewhat larger file at comparable quality."
+            : "Uses CPU-based encoding only. This is slower and uses more CPU, but generally provides better compression and consistent quality, so the estimates use lower bitrate targets.";
+    }
+
     private void UpdateSelection()
     {
         var buttons = new[] { OriginalButton, H264Button, HevcButton, Av1Button };
@@ -84,6 +108,8 @@ public partial class ExportOptionsWindow : Window
                 ? new System.Windows.Media.SolidColorBrush(System.Windows.Media.Color.FromRgb(102, 192, 244))
                 : new System.Windows.Media.SolidColorBrush(System.Windows.Media.Color.FromRgb(52, 60, 73));
         }
+
+        HardwareEncodingCheckBox.IsEnabled = SelectedCodec != ExportVideoCodec.Original;
 
         (SelectedCodecText.Text, CodecHintText.Text) = SelectedCodec switch
         {

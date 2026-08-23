@@ -11,6 +11,8 @@ The project adopts semantic versioning beginning with **1.0.0**.
 - Added bundled FFmpeg transcoding for H.264, HEVC, and AV1 exports with
   hardware-encoder fallback, live progress and ETA, cancellation cleanup, and
   ffprobe validation of audio and video streams.
+- Added an export option to disable hardware encoding, with software-specific
+  bitrate estimates and guidance about speed, CPU use, quality, and compression.
 - Added licensing notices, checksum verification, and exact corresponding-source
   metadata for the bundled FFmpeg GPL build.
 

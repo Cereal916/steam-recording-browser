@@ -40,6 +40,7 @@ public sealed class LibVlcService : IDisposable
         RecordingItem item,
         string destination,
         ExportVideoCodec codec,
+        bool useHardwareEncoding,
         IProgress<string>? status,
         CancellationToken cancellationToken)
     {
@@ -51,7 +52,7 @@ public sealed class LibVlcService : IDisposable
         {
             if (codec != ExportVideoCodec.Original)
             {
-                await _ffmpeg.ExportAsync(item, incompleteDestination, codec, status, cancellationToken)
+                await _ffmpeg.ExportAsync(item, incompleteDestination, codec, useHardwareEncoding, status, cancellationToken)
                     .ConfigureAwait(false);
             }
             else

@@ -2081,7 +2081,8 @@ private readonly DispatcherTimer _hoverFramePauseTimer;
             _player.Pause();
 
         var progressWindow = new ExportProgressWindow((progress, cancellationToken) =>
-            _vlc.ExportMp4Async(_item, dialog.FileName, options.SelectedCodec, progress, cancellationToken))
+            _vlc.ExportMp4Async(_item, dialog.FileName, options.SelectedCodec,
+                options.UseHardwareEncoding, progress, cancellationToken))
         {
             Owner = this
         };

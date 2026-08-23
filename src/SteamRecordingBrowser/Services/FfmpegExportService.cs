@@ -19,12 +19,13 @@ public sealed class FfmpegExportService
         RecordingItem item,
         string destination,
         ExportVideoCodec codec,
+        bool useHardwareEncoding,
         IProgress<string>? status,
         CancellationToken cancellationToken)
     {
         try
         {
-            await ExportCoreAsync(item, destination, codec, status, cancellationToken).ConfigureAwait(false);
+            await ExportCoreAsync(item, destination, codec, useHardwareEncoding, status, cancellationToken).ConfigureAwait(false);
         }
         catch (OperationCanceledException)
         {
@@ -37,13 +38,14 @@ public sealed class FfmpegExportService
         RecordingItem item,
         string destination,
         ExportVideoCodec codec,
+        bool useHardwareEncoding,
         IProgress<string>? status,
         CancellationToken cancellationToken)
     {
         var ffmpeg = FindFfmpeg() ?? throw MissingFfmpegException();
         var manifest = _dash.GetPlaybackManifest(item.Path);
         var encoders = await GetEncodersAsync(ffmpeg, cancellationToken).ConfigureAwait(false);
-        var candidates = BuildEncoderCandidates(codec, encoders);
+        var candidates = BuildEncoderCandidates(codec, encoders, useHardwareEncoding);
 
         if (candidates.Count == 0)
             throw new InvalidOperationException($"The bundled FFmpeg build has no {codec.DisplayName()} encoder.");
@@ -219,36 +221,47 @@ public sealed class FfmpegExportService
 
     private static List<EncoderCandidate> BuildEncoderCandidates(
         ExportVideoCodec codec,
-        IReadOnlySet<string> available)
+        IReadOnlySet<string> available,
+        bool useHardwareEncoding)
     {
+        var h264Rate = useHardwareEncoding ? "12M" : "10M";
+        var h264MaxRate = useHardwareEncoding ? "14M" : "12M";
+        var h264Buffer = useHardwareEncoding ? "24M" : "20M";
+        var hevcRate = useHardwareEncoding ? "8M" : "7M";
+        var hevcMaxRate = useHardwareEncoding ? "10M" : "9M";
+        var hevcBuffer = useHardwareEncoding ? "16M" : "14M";
+        var av1Rate = useHardwareEncoding ? "6M" : "5M";
         var candidates = codec switch
         {
             ExportVideoCodec.H264 => new[]
             {
-                Candidate("h264_nvenc", "NVIDIA NVENC", "-preset", "p5", "-b:v", "12M", "-maxrate", "14M", "-bufsize", "24M", "-pix_fmt", "yuv420p"),
-                Candidate("h264_qsv", "Intel Quick Sync", "-preset", "medium", "-b:v", "12M", "-maxrate", "14M", "-bufsize", "24M", "-pix_fmt", "nv12"),
-                Candidate("h264_amf", "AMD AMF", "-quality", "balanced", "-b:v", "12M", "-maxrate", "14M", "-bufsize", "24M", "-pix_fmt", "nv12"),
-                Candidate("libx264", "H.264 software", "-preset", "medium", "-b:v", "12M", "-maxrate", "14M", "-bufsize", "24M", "-pix_fmt", "yuv420p")
+                Candidate("h264_nvenc", "NVIDIA NVENC", "-preset", "p5", "-b:v", h264Rate, "-maxrate", h264MaxRate, "-bufsize", h264Buffer, "-pix_fmt", "yuv420p"),
+                Candidate("h264_qsv", "Intel Quick Sync", "-preset", "medium", "-b:v", h264Rate, "-maxrate", h264MaxRate, "-bufsize", h264Buffer, "-pix_fmt", "nv12"),
+                Candidate("h264_amf", "AMD AMF", "-quality", "balanced", "-b:v", h264Rate, "-maxrate", h264MaxRate, "-bufsize", h264Buffer, "-pix_fmt", "nv12"),
+                Candidate("libx264", "H.264 software", "-preset", "medium", "-b:v", h264Rate, "-maxrate", h264MaxRate, "-bufsize", h264Buffer, "-pix_fmt", "yuv420p")
             },
             ExportVideoCodec.Hevc => new[]
             {
-                Candidate("hevc_nvenc", "NVIDIA NVENC", "-preset", "p5", "-b:v", "8M", "-maxrate", "10M", "-bufsize", "16M", "-pix_fmt", "yuv420p", "-tag:v", "hvc1"),
-                Candidate("hevc_qsv", "Intel Quick Sync", "-preset", "medium", "-b:v", "8M", "-maxrate", "10M", "-bufsize", "16M", "-pix_fmt", "nv12", "-tag:v", "hvc1"),
-                Candidate("hevc_amf", "AMD AMF", "-quality", "balanced", "-b:v", "8M", "-maxrate", "10M", "-bufsize", "16M", "-pix_fmt", "nv12", "-tag:v", "hvc1"),
-                Candidate("libx265", "HEVC software", "-preset", "medium", "-b:v", "8M", "-maxrate", "10M", "-bufsize", "16M", "-pix_fmt", "yuv420p", "-tag:v", "hvc1")
+                Candidate("hevc_nvenc", "NVIDIA NVENC", "-preset", "p5", "-b:v", hevcRate, "-maxrate", hevcMaxRate, "-bufsize", hevcBuffer, "-pix_fmt", "yuv420p", "-tag:v", "hvc1"),
+                Candidate("hevc_qsv", "Intel Quick Sync", "-preset", "medium", "-b:v", hevcRate, "-maxrate", hevcMaxRate, "-bufsize", hevcBuffer, "-pix_fmt", "nv12", "-tag:v", "hvc1"),
+                Candidate("hevc_amf", "AMD AMF", "-quality", "balanced", "-b:v", hevcRate, "-maxrate", hevcMaxRate, "-bufsize", hevcBuffer, "-pix_fmt", "nv12", "-tag:v", "hvc1"),
+                Candidate("libx265", "HEVC software", "-preset", "medium", "-b:v", hevcRate, "-maxrate", hevcMaxRate, "-bufsize", hevcBuffer, "-pix_fmt", "yuv420p", "-tag:v", "hvc1")
             },
             ExportVideoCodec.Av1 => new[]
             {
-                Candidate("av1_nvenc", "NVIDIA NVENC", "-preset", "p5", "-b:v", "6M", "-pix_fmt", "yuv420p"),
-                Candidate("av1_qsv", "Intel Quick Sync", "-preset", "medium", "-b:v", "6M", "-pix_fmt", "nv12"),
-                Candidate("av1_amf", "AMD AMF", "-quality", "balanced", "-b:v", "6M", "-pix_fmt", "nv12"),
-                Candidate("libsvtav1", "SVT-AV1 software", "-preset", "8", "-b:v", "6M", "-pix_fmt", "yuv420p"),
-                Candidate("libaom-av1", "AOM AV1 software", "-cpu-used", "6", "-b:v", "6M", "-pix_fmt", "yuv420p")
+                Candidate("av1_nvenc", "NVIDIA NVENC", "-preset", "p5", "-b:v", av1Rate, "-pix_fmt", "yuv420p"),
+                Candidate("av1_qsv", "Intel Quick Sync", "-preset", "medium", "-b:v", av1Rate, "-pix_fmt", "nv12"),
+                Candidate("av1_amf", "AMD AMF", "-quality", "balanced", "-b:v", av1Rate, "-pix_fmt", "nv12"),
+                Candidate("libsvtav1", "SVT-AV1 software", "-preset", "8", "-b:v", av1Rate, "-pix_fmt", "yuv420p"),
+                Candidate("libaom-av1", "AOM AV1 software", "-cpu-used", "6", "-b:v", av1Rate, "-pix_fmt", "yuv420p")
             },
             _ => Array.Empty<EncoderCandidate>()
         };
 
-        return candidates.Where(candidate => available.Contains(candidate.Name)).ToList();
+        return candidates
+            .Where(candidate => available.Contains(candidate.Name))
+            .Where(candidate => useHardwareEncoding || candidate.Name.StartsWith("lib", StringComparison.Ordinal))
+            .ToList();
     }
 
     private static EncoderCandidate Candidate(string name, string displayName, params string[] args) =>

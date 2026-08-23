@@ -60,7 +60,9 @@ and falls back to libx264, libx265, SVT-AV1, or libaom software encoding.
 
 The service parses machine-readable progress, supports cancellation, removes
 failed partial files, retries after unsupported hardware encoders, and uses
-ffprobe to require both video and audio streams before reporting success.
+ffprobe to require both video and audio streams before reporting success. Users
+can disable hardware candidates when they prefer slower, more efficient
+software encoding.
 
 ### `PlayerWindow`
 

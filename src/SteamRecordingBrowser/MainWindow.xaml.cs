@@ -731,7 +731,8 @@ public partial class MainWindow : Window
         if (dialog.ShowDialog(this) != true) return;
 
         var progressWindow = new ExportProgressWindow((progress, cancellationToken) =>
-            _vlc.ExportMp4Async(item, dialog.FileName, options.SelectedCodec, progress, cancellationToken))
+            _vlc.ExportMp4Async(item, dialog.FileName, options.SelectedCodec,
+                options.UseHardwareEncoding, progress, cancellationToken))
         {
             Owner = this
         };
