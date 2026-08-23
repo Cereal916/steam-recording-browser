@@ -4,7 +4,7 @@ All notable changes to Steam Recording Browser are documented here.
 
 The project adopts semantic versioning beginning with **1.0.0**.
 
-## Unreleased
+## 1.3.0 - 2026-08-23
 
 ### Added
 
@@ -32,6 +32,7 @@ The project adopts semantic versioning beginning with **1.0.0**.
   that are promoted to the final filename only after validation succeeds.
 - Added licensing notices, checksum verification, and exact corresponding-source
   metadata for the bundled FFmpeg GPL build.
+
 ### Changed
 
 - Kept Original codec exports on the existing lossless libVLC remux path while
