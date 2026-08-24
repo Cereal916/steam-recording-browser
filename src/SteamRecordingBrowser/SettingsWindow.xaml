@@ -190,7 +190,7 @@
                 <StackPanel VerticalAlignment="Center" Margin="0,0,24,0">
                     <TextBlock Text="Clip layout" FontSize="16" FontWeight="SemiBold"
                                LineHeight="22"/>
-                    <TextBlock Text="Show clips as visual tiles instead of the detailed list."
+                    <TextBlock Text="Choose a visual list, thumbnail tiles, or a sortable data table."
                                Margin="0,8,0,0" Foreground="#98A2B3" FontSize="13"
                                LineHeight="19" TextWrapping="Wrap"/>
                 </StackPanel>

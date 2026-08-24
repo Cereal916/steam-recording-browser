@@ -25,8 +25,8 @@ public partial class SettingsWindow : Window
         var settings = _settings.Load();
         RecordingRootBox.Text = settings.RecordingRoot;
         _initializingLayout = true;
-        LayoutSelector.ItemsSource = new[] { "List", "Tiles" };
-        LayoutSelector.SelectedItem = settings.UseTileLayout ? "Tiles" : "List";
+        LayoutSelector.ItemsSource = new[] { "List", "Tiles", "Table" };
+        LayoutSelector.SelectedItem = settings.EffectiveClipLayout;
         _initializingLayout = false;
         UpdateShortcutStatus();
         UpdateLogStorageStatus();
@@ -37,7 +37,7 @@ public partial class SettingsWindow : Window
         if (_initializingLayout)
             return;
 
-        _settings.SaveUseTileLayout(LayoutSelector.SelectedItem as string == "Tiles");
+        _settings.SaveClipLayout(LayoutSelector.SelectedItem as string ?? "List");
         ClipLayoutChanged = true;
     }
 

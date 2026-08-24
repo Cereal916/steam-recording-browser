@@ -1,8 +1,10 @@
 using System.Collections.ObjectModel;
+using System.ComponentModel;
 using System.Diagnostics;
 using System.IO;
 using System.Windows;
 using System.Windows.Controls;
+using System.Windows.Input;
 using System.Windows.Media.Imaging;
 using System.Windows.Threading;
 using MediaColor = System.Windows.Media.Color;
@@ -52,6 +54,11 @@ public partial class MainWindow : Window
     private LogViewerWindow? _logViewer;
     private DispatcherTimer? _searchFilterTimer;
     private DispatcherOperation? _dateTimelineUpdateOperation;
+    private readonly ObservableCollection<TableColumnOption> _tableColumnOptions = new();
+    private bool _updatingTableColumns;
+    private Point _columnDragStart;
+    private TableColumnOption? _draggedTableColumn;
+    private List<TableColumnOption>? _columnOrderBeforeDrag;
 
     private async void Settings_Click(object sender, RoutedEventArgs e)
     {
@@ -82,6 +89,7 @@ public partial class MainWindow : Window
 
         ReportStartup(21, "Creating main window…");
         InitializeComponent();
+        InitializeTableColumns();
         VersionText.Text = $"v{AppInfo.Version}";
 
         ReportStartup(25, "Loading clip metadata…");
@@ -99,7 +107,7 @@ public partial class MainWindow : Window
 
         _clipPreviewDelayTimer = new DispatcherTimer
         {
-            Interval = TimeSpan.FromMilliseconds(500)
+            Interval = TimeSpan.FromMilliseconds(400)
         };
         _clipPreviewDelayTimer.Tick += ClipPreviewDelayTimer_Tick;
 
@@ -353,6 +361,23 @@ public partial class MainWindow : Window
                 x.Tags.Any(t => t.Contains(captured, StringComparison.OrdinalIgnoreCase)));
         }
 
+        var useTableFilters = TableLayoutPanel.Visibility == Visibility.Visible;
+        var tableGame = useTableFilters ? TableGameFilter.Text?.Trim() ?? "" : "";
+        var tableType = useTableFilters ? TableTypeFilter.Text?.Trim() ?? "" : "";
+        var tableCodec = useTableFilters ? TableCodecFilter.Text?.Trim() ?? "" : "";
+        var tableMetadata = useTableFilters ? TableMetadataFilter.Text?.Trim() ?? "" : "";
+        if (tableGame.Length > 0)
+            query = query.Where(x => x.GameName.Contains(tableGame, StringComparison.OrdinalIgnoreCase));
+        if (tableType.Length > 0)
+            query = query.Where(x => x.RecordingTypeLabel.Contains(tableType, StringComparison.OrdinalIgnoreCase));
+        if (tableCodec.Length > 0)
+            query = query.Where(x => x.VideoCodec.Contains(tableCodec, StringComparison.OrdinalIgnoreCase) ||
+                                     x.AudioCodec.Contains(tableCodec, StringComparison.OrdinalIgnoreCase));
+        if (tableMetadata.Length > 0)
+            query = query.Where(x => x.Description.Contains(tableMetadata, StringComparison.OrdinalIgnoreCase) ||
+                                     x.Tags.Any(tag => tag.Contains(tableMetadata, StringComparison.OrdinalIgnoreCase)) ||
+                                     x.SteamMetadata.Any(value => value.Contains(tableMetadata, StringComparison.OrdinalIgnoreCase)));
+
         query = _sortMode switch
         {
             "Oldest" => query.OrderBy(x => x.Timestamp),
@@ -405,7 +430,12 @@ public partial class MainWindow : Window
             !string.IsNullOrWhiteSpace(_selectedGameId) ||
             !string.IsNullOrWhiteSpace(_selectedTag) ||
             FavoritesOnly.IsChecked == true ||
-            !string.IsNullOrWhiteSpace(SearchBox.Text);
+            !string.IsNullOrWhiteSpace(SearchBox.Text) ||
+            TableLayoutPanel.Visibility == Visibility.Visible &&
+            (!string.IsNullOrWhiteSpace(TableGameFilter.Text) ||
+             !string.IsNullOrWhiteSpace(TableTypeFilter.Text) ||
+             !string.IsNullOrWhiteSpace(TableCodecFilter.Text) ||
+             !string.IsNullOrWhiteSpace(TableMetadataFilter.Text));
 
         FilterStatusPanel.Visibility = active ? Visibility.Visible : Visibility.Collapsed;
         FilterStatusText.Text = $"Showing {_visibleItems.Count} of {_allItems.Count} clips";
@@ -714,8 +744,9 @@ public partial class MainWindow : Window
         }
     }
 
-    private RecordingItem? SelectedItem =>
-        TileLayoutPanel.Visibility == Visibility.Visible
+    private RecordingItem? SelectedItem => TableLayoutPanel.Visibility == Visibility.Visible
+        ? RecordingTable.SelectedItem as RecordingItem
+        : TileLayoutPanel.Visibility == Visibility.Visible
             ? TileRecordingList.SelectedItem as RecordingItem
             : RecordingList.SelectedItem as RecordingItem;
 
@@ -807,6 +838,15 @@ public partial class MainWindow : Window
         ApplyFilter();
     }
 
+    private void TableFavorite_Click(object sender, RoutedEventArgs e)
+    {
+        if (sender is not FrameworkElement { DataContext: RecordingItem item }) return;
+        item.IsFavorite = !item.IsFavorite;
+        _metadata.UpdateFrom(item);
+        ApplyFilter();
+        e.Handled = true;
+    }
+
     private void DescriptionMenu_Click(object sender, RoutedEventArgs e)
     {
         var item = SelectedItem;
@@ -870,6 +910,241 @@ public partial class MainWindow : Window
         ApplyFilter();
     }
 
+    private void TableFilter_TextChanged(object sender, TextChangedEventArgs e)
+    {
+        _searchFilterTimer?.Stop();
+        _searchFilterTimer?.Start();
+    }
+
+    private void ClearTableFilters_Click(object sender, RoutedEventArgs e)
+    {
+        TableGameFilter.Clear();
+        TableTypeFilter.Clear();
+        TableCodecFilter.Clear();
+        TableMetadataFilter.Clear();
+        ApplyFilter();
+    }
+
+    private void InitializeTableColumns()
+    {
+        _updatingTableColumns = true;
+        try
+        {
+            var saved = _settings.Load().TableColumns
+                .Where(column => !string.IsNullOrWhiteSpace(column.Name))
+                .GroupBy(column => column.Name, StringComparer.OrdinalIgnoreCase)
+                .ToDictionary(group => group.Key, group => group.First(), StringComparer.OrdinalIgnoreCase);
+            var ordered = RecordingTable.Columns
+                .Select((column, defaultIndex) => new
+                {
+                    Column = column,
+                    Name = ReferenceEquals(column, FavoriteColumn)
+                        ? "Favorite"
+                        : column.Header?.ToString() ?? $"Column {defaultIndex + 1}",
+                    DefaultIndex = defaultIndex
+                })
+                .OrderBy(entry => saved.TryGetValue(entry.Name, out var setting)
+                    ? setting.DisplayIndex
+                    : int.MaxValue)
+                .ThenBy(entry => entry.DefaultIndex)
+                .ToList();
+
+            for (var index = 0; index < ordered.Count; index++)
+                ordered[index].Column.DisplayIndex = index;
+
+            _tableColumnOptions.Clear();
+            foreach (var entry in ordered)
+            {
+                var visible = !saved.TryGetValue(entry.Name, out var setting) || setting.IsVisible;
+                if (setting?.Width > 0)
+                    entry.Column.Width = new DataGridLength(Math.Clamp(setting.Width, 40, 1200));
+                entry.Column.Visibility = visible ? Visibility.Visible : Visibility.Collapsed;
+                _tableColumnOptions.Add(new TableColumnOption(entry.Name, entry.Column, visible));
+            }
+            ColumnChooserList.ItemsSource = _tableColumnOptions;
+        }
+        finally
+        {
+            _updatingTableColumns = false;
+        }
+    }
+
+    private void ColumnChooserButton_Click(object sender, RoutedEventArgs e) =>
+        ColumnChooserPopup.IsOpen = !ColumnChooserPopup.IsOpen;
+
+    private void ColumnChooserList_PreviewMouseLeftButtonDown(object sender, MouseButtonEventArgs e)
+    {
+        _draggedTableColumn = null;
+        if (FindVisualAncestor<TextBlock>(e.OriginalSource as DependencyObject) is not { Tag: "ColumnDragHandle" })
+            return;
+
+        var container = ItemsControl.ContainerFromElement(ColumnChooserList, e.OriginalSource as DependencyObject)
+            as ListBoxItem;
+        if (container?.DataContext is not TableColumnOption option) return;
+        _columnDragStart = e.GetPosition(ColumnChooserList);
+        _draggedTableColumn = option;
+        ColumnChooserList.SelectedItem = option;
+    }
+
+    private void ColumnChooserList_PreviewMouseMove(object sender, MouseEventArgs e)
+    {
+        if (_draggedTableColumn is null || e.LeftButton != MouseButtonState.Pressed) return;
+        var position = e.GetPosition(ColumnChooserList);
+        if (Math.Abs(position.X - _columnDragStart.X) < SystemParameters.MinimumHorizontalDragDistance &&
+            Math.Abs(position.Y - _columnDragStart.Y) < SystemParameters.MinimumVerticalDragDistance)
+            return;
+
+        var dragged = _draggedTableColumn;
+        _draggedTableColumn = null;
+        _columnOrderBeforeDrag = _tableColumnOptions.ToList();
+        var result = DragDrop.DoDragDrop(ColumnChooserList, dragged, DragDropEffects.Move);
+        if (result != DragDropEffects.Move && _columnOrderBeforeDrag is not null)
+            ApplyTableColumnOrder(_columnOrderBeforeDrag);
+        _columnOrderBeforeDrag = null;
+    }
+
+    private void ColumnChooserList_DragOver(object sender, DragEventArgs e)
+    {
+        if (e.Data.GetData(typeof(TableColumnOption)) is not TableColumnOption dragged)
+        {
+            e.Effects = DragDropEffects.None;
+            e.Handled = true;
+            return;
+        }
+
+        var targetContainer = ItemsControl.ContainerFromElement(ColumnChooserList, e.OriginalSource as DependencyObject)
+            as ListBoxItem;
+        if (targetContainer?.DataContext is TableColumnOption target && !ReferenceEquals(dragged, target))
+            MoveTableColumn(dragged, _tableColumnOptions.IndexOf(target), persist: false);
+
+        e.Effects = DragDropEffects.Move;
+        e.Handled = true;
+    }
+
+    private void ColumnChooserList_Drop(object sender, DragEventArgs e)
+    {
+        if (e.Data.GetData(typeof(TableColumnOption)) is not TableColumnOption dragged) return;
+        var targetContainer = ItemsControl.ContainerFromElement(ColumnChooserList, e.OriginalSource as DependencyObject)
+            as ListBoxItem;
+        if (targetContainer?.DataContext is TableColumnOption target && !ReferenceEquals(dragged, target))
+            MoveTableColumn(dragged, _tableColumnOptions.IndexOf(target), persist: false);
+        SaveTableColumnSettings();
+        e.Effects = DragDropEffects.Move;
+        e.Handled = true;
+    }
+
+    private void ColumnVisibility_Changed(object sender, RoutedEventArgs e)
+    {
+        if (_updatingTableColumns || sender is not CheckBox { DataContext: TableColumnOption option })
+            return;
+
+        if (!option.IsVisible && _tableColumnOptions.Count(column => column.IsVisible) == 0)
+        {
+            option.IsVisible = true;
+            return;
+        }
+
+        option.Column.Visibility = option.IsVisible ? Visibility.Visible : Visibility.Collapsed;
+        SaveTableColumnSettings();
+    }
+
+    private void MoveColumnUp_Click(object sender, RoutedEventArgs e) => MoveSelectedTableColumn(-1);
+    private void MoveColumnDown_Click(object sender, RoutedEventArgs e) => MoveSelectedTableColumn(1);
+
+    private void MoveSelectedTableColumn(int offset)
+    {
+        if (ColumnChooserList.SelectedItem is not TableColumnOption option) return;
+        var currentIndex = _tableColumnOptions.IndexOf(option);
+        var targetIndex = currentIndex + offset;
+        if (targetIndex < 0 || targetIndex >= _tableColumnOptions.Count) return;
+
+        MoveTableColumn(option, targetIndex);
+    }
+
+    private void MoveTableColumn(TableColumnOption option, int targetIndex, bool persist = true)
+    {
+        var currentIndex = _tableColumnOptions.IndexOf(option);
+        if (currentIndex < 0 || targetIndex < 0 || targetIndex >= _tableColumnOptions.Count || currentIndex == targetIndex)
+            return;
+
+        _updatingTableColumns = true;
+        try
+        {
+            option.Column.DisplayIndex = targetIndex;
+            _tableColumnOptions.Move(currentIndex, targetIndex);
+            ColumnChooserList.SelectedItem = option;
+        }
+        finally
+        {
+            _updatingTableColumns = false;
+        }
+        if (persist)
+            SaveTableColumnSettings();
+    }
+
+    private void ApplyTableColumnOrder(IReadOnlyList<TableColumnOption> order)
+    {
+        _updatingTableColumns = true;
+        try
+        {
+            for (var targetIndex = 0; targetIndex < order.Count; targetIndex++)
+            {
+                var option = order[targetIndex];
+                option.Column.DisplayIndex = targetIndex;
+                var currentIndex = _tableColumnOptions.IndexOf(option);
+                if (currentIndex != targetIndex)
+                    _tableColumnOptions.Move(currentIndex, targetIndex);
+            }
+        }
+        finally
+        {
+            _updatingTableColumns = false;
+        }
+    }
+
+    private static T? FindVisualAncestor<T>(DependencyObject? child) where T : DependencyObject
+    {
+        while (child is not null)
+        {
+            if (child is T match) return match;
+            child = System.Windows.Media.VisualTreeHelper.GetParent(child);
+        }
+        return null;
+    }
+
+    private void RecordingTable_ColumnReordered(object sender, DataGridColumnEventArgs e)
+    {
+        if (_updatingTableColumns) return;
+        _updatingTableColumns = true;
+        try
+        {
+            var ordered = _tableColumnOptions.OrderBy(option => option.Column.DisplayIndex).ToList();
+            _tableColumnOptions.Clear();
+            foreach (var option in ordered) _tableColumnOptions.Add(option);
+        }
+        finally
+        {
+            _updatingTableColumns = false;
+        }
+        SaveTableColumnSettings();
+    }
+
+    private void TableColumnResize_DragCompleted(
+        object sender,
+        System.Windows.Controls.Primitives.DragCompletedEventArgs e) =>
+        SaveTableColumnSettings();
+
+    private void SaveTableColumnSettings() =>
+        _settings.SaveTableColumns(_tableColumnOptions
+            .OrderBy(option => option.Column.DisplayIndex)
+            .Select(option => new TableColumnSetting
+            {
+                Name = option.Name,
+                IsVisible = option.IsVisible,
+                DisplayIndex = option.Column.DisplayIndex,
+                Width = option.Column.ActualWidth
+            }));
+
     private void GameFilter_SelectionChanged(object sender, SelectionChangedEventArgs e)
     {
         if (GameFilter.SelectedItem is GameFilterItem selected)
@@ -895,6 +1170,10 @@ public partial class MainWindow : Window
     private void ClearFilters_Click(object sender, RoutedEventArgs e)
     {
         SearchBox.Text = "";
+        TableGameFilter.Clear();
+        TableTypeFilter.Clear();
+        TableCodecFilter.Clear();
+        TableMetadataFilter.Clear();
         FavoritesOnly.IsChecked = false;
         _selectedGameId = "";
         _selectedTag = "";
@@ -969,12 +1248,16 @@ public partial class MainWindow : Window
 
     private void ApplyClipLayout()
     {
-        var useTiles = _settings.Load().UseTileLayout;
+        var layout = _settings.Load().EffectiveClipLayout;
         StopClipPreview(closePopup: true);
-        ListLayoutPanel.Visibility = useTiles ? Visibility.Collapsed : Visibility.Visible;
-        TileLayoutPanel.Visibility = useTiles ? Visibility.Visible : Visibility.Collapsed;
-        RecordingList.ItemsSource = useTiles ? null : _visibleItems;
-        TileRecordingList.ItemsSource = useTiles ? _visibleItems : null;
+        ListLayoutPanel.Visibility = layout == "List" ? Visibility.Visible : Visibility.Collapsed;
+        TileLayoutPanel.Visibility = layout == "Tiles" ? Visibility.Visible : Visibility.Collapsed;
+        TableLayoutPanel.Visibility = layout == "Table" ? Visibility.Visible : Visibility.Collapsed;
+        RecordingList.ItemsSource = layout == "List" ? _visibleItems : null;
+        TileRecordingList.ItemsSource = layout == "Tiles" ? _visibleItems : null;
+        RecordingTable.ItemsSource = layout == "Table" ? _visibleItems : null;
+
+        ApplyFilter();
 
         ScheduleDateTimelineUpdate();
     }
@@ -1078,4 +1361,31 @@ public partial class MainWindow : Window
     }
 
     private sealed record GameFilterItem(string Id, string Name);
+
+    private sealed class TableColumnOption : INotifyPropertyChanged
+    {
+        private bool _isVisible;
+
+        public TableColumnOption(string name, DataGridColumn column, bool isVisible)
+        {
+            Name = name;
+            Column = column;
+            _isVisible = isVisible;
+        }
+
+        public string Name { get; }
+        public DataGridColumn Column { get; }
+        public bool IsVisible
+        {
+            get => _isVisible;
+            set
+            {
+                if (_isVisible == value) return;
+                _isVisible = value;
+                PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(nameof(IsVisible)));
+            }
+        }
+
+        public event PropertyChangedEventHandler? PropertyChanged;
+    }
 }

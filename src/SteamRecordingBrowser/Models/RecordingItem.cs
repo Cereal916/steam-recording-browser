@@ -51,6 +51,8 @@ public sealed class RecordingItem : INotifyPropertyChanged
     public string DisplayTime => Timestamp.ToString("MMM d, yyyy  h:mm:ss tt");
     public string DurationText => DurationSeconds > 0 ? FormatDuration(DurationSeconds) : "—";
     public string SizeText => FormatBytes(SizeBytes);
+    public int SessionCount => Math.Max(1, SessionPaths.Count);
+    public string SteamMetadataDisplay => string.Join("; ", SteamMetadata);
     public string VideoInfoText
     {
         get
@@ -83,10 +85,18 @@ public sealed class RecordingItem : INotifyPropertyChanged
     public bool IsFavorite
     {
         get => _isFavorite;
-        set { if (_isFavorite != value) { _isFavorite = value; OnPropertyChanged(); OnPropertyChanged(nameof(FavoriteGlyph)); } }
+        set
+        {
+            if (_isFavorite == value) return;
+            _isFavorite = value;
+            OnPropertyChanged();
+            OnPropertyChanged(nameof(FavoriteGlyph));
+            OnPropertyChanged(nameof(TableFavoriteGlyph));
+        }
     }
 
     public string FavoriteGlyph => IsFavorite ? "★" : "";
+    public string TableFavoriteGlyph => IsFavorite ? "★" : "☆";
 
     public string Description
     {
@@ -106,6 +116,7 @@ public sealed class RecordingItem : INotifyPropertyChanged
     }
 
     public string TagDisplay => Tags.Count > 0 ? "Tags: " + string.Join(", ", Tags) : "";
+    public string TagsText => string.Join(", ", Tags);
 
     public event PropertyChangedEventHandler? PropertyChanged;
 

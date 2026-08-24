@@ -52,13 +52,21 @@ public sealed class SettingsService
         Save(settings);
     }
 
-    public void SaveUseTileLayout(bool useTileLayout)
+    public void SaveClipLayout(string layout)
     {
         var settings = Load();
-        settings.UseTileLayout = useTileLayout;
+        settings.ClipLayout = layout is "List" or "Tiles" or "Table" ? layout : "List";
+        settings.UseTileLayout = settings.ClipLayout == "Tiles";
         Save(settings);
 
-        AppLogger.Write($"Saved clip layout: {(useTileLayout ? "Tiles" : "List")}");
+        AppLogger.Write($"Saved clip layout: {settings.ClipLayout}");
+    }
+
+    public void SaveTableColumns(IEnumerable<TableColumnSetting> columns)
+    {
+        var settings = Load();
+        settings.TableColumns = columns.ToList();
+        Save(settings);
     }
 
     private static void Save(AppSettings settings)
@@ -86,4 +94,18 @@ public sealed class AppSettings
     public string RecordingRoot { get; set; } = "";
     public bool DesktopShortcutPromptShown { get; set; }
     public bool UseTileLayout { get; set; }
+    public string ClipLayout { get; set; } = "";
+    public List<TableColumnSetting> TableColumns { get; set; } = new();
+
+    public string EffectiveClipLayout => ClipLayout is "List" or "Tiles" or "Table"
+        ? ClipLayout
+        : UseTileLayout ? "Tiles" : "List";
+}
+
+public sealed class TableColumnSetting
+{
+    public string Name { get; set; } = "";
+    public bool IsVisible { get; set; } = true;
+    public int DisplayIndex { get; set; }
+    public double Width { get; set; }
 }
