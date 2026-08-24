@@ -7,6 +7,12 @@ namespace SteamRecordingBrowser;
 
 public partial class App : Application
 {
+    protected override void OnExit(ExitEventArgs e)
+    {
+        try { AppLogger.FlushAndStopAsync().GetAwaiter().GetResult(); } catch { }
+        base.OnExit(e);
+    }
+
     protected override void OnStartup(StartupEventArgs e)
     {
         base.OnStartup(e);

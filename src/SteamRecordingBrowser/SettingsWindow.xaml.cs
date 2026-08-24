@@ -1,4 +1,5 @@
 using System.IO;
+using System.Diagnostics;
 using System.Windows;
 using SteamRecordingBrowser.Models;
 using SteamRecordingBrowser.Services;
@@ -28,6 +29,7 @@ public partial class SettingsWindow : Window
         LayoutSelector.SelectedItem = settings.UseTileLayout ? "Tiles" : "List";
         _initializingLayout = false;
         UpdateShortcutStatus();
+        UpdateLogStorageStatus();
     }
 
     private void LayoutSelector_SelectionChanged(object sender, System.Windows.Controls.SelectionChangedEventArgs e)
@@ -163,6 +165,49 @@ public partial class SettingsWindow : Window
             ShortcutStatusText.Text = "Add a shortcut to your desktop for quick access.";
             CreateShortcutButton.Content = "Create shortcut";
         }
+    }
+
+    private void OpenLogFolder_Click(object sender, RoutedEventArgs e)
+    {
+        try
+        {
+            Directory.CreateDirectory(AppLogger.LogDirectory);
+            Process.Start(new ProcessStartInfo("explorer.exe", AppLogger.LogDirectory)
+            {
+                UseShellExecute = true
+            });
+        }
+        catch (Exception ex)
+        {
+            AppLogger.WriteException("Could not open application log folder", ex);
+            MessageBox.Show(this, "The log folder could not be opened.", "Application logs",
+                MessageBoxButton.OK, MessageBoxImage.Warning);
+        }
+    }
+
+    private async void ClearArchivedLogs_Click(object sender, RoutedEventArgs e)
+    {
+        if (MessageBox.Show(this, "Delete all archived log files? The active log will be kept.",
+                "Clear archived logs", MessageBoxButton.YesNo, MessageBoxImage.Question) != MessageBoxResult.Yes)
+            return;
+
+        try
+        {
+            await AppLogger.ClearArchivedLogsAsync();
+            UpdateLogStorageStatus();
+        }
+        catch (Exception ex)
+        {
+            AppLogger.WriteException("Could not clear archived application logs", ex);
+            MessageBox.Show(this, "Some archived logs could not be deleted.", "Application logs",
+                MessageBoxButton.OK, MessageBoxImage.Warning);
+        }
+    }
+
+    private void UpdateLogStorageStatus()
+    {
+        var bytes = AppLogger.GetLogStorageBytes();
+        LogStorageStatusText.Text = $"Current log storage: {RecordingItem.FormatBytes(bytes)} (maximum approximately 60 MB).";
     }
 
     private void Close_Click(object sender, RoutedEventArgs e) => Close();

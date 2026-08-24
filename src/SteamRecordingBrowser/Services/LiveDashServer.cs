@@ -106,7 +106,7 @@ public sealed class LiveDashServer : IDisposable
                     var manifest = _dash.CreateBridgedLiveManifest(_manifestPaths[activeIndex], activeIndex);
                     var bytes = Encoding.UTF8.GetBytes(manifest);
                     var manifestRequest = Interlocked.Increment(ref _liveManifestRequestCount);
-                    if (manifestRequest <= 5 || manifestRequest % 60 == 0)
+                    if (manifestRequest <= 3 || manifestRequest % 120 == 0)
                         AppLogger.Write(
                             $"Dynamic DASH manifest served. request={manifestRequest} session={activeIndex} " +
                             $"bytes={bytes.Length} source={_manifestPaths[activeIndex]}", "DEBUG");
@@ -136,7 +136,7 @@ public sealed class LiveDashServer : IDisposable
                 }
 
                 var segmentRequest = Interlocked.Increment(ref _segmentRequestCount);
-                if (segmentRequest <= 12 || segmentRequest % 100 == 0)
+                if (segmentRequest <= 3 || segmentRequest % 500 == 0)
                     AppLogger.Write(
                         $"DASH segment served. request={segmentRequest} path={requestPath} " +
                         $"bytes={new FileInfo(filePath).Length} ageMs=" +

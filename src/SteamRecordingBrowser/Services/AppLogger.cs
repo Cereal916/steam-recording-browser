@@ -8,7 +8,10 @@ namespace SteamRecordingBrowser.Services;
 public static class AppLogger
 {
     private const int MaximumSessionEntries = 5_000;
+    private const long MaximumLogFileBytes = 10 * 1024 * 1024;
+    private const int MaximumArchiveFiles = 5;
     private static readonly object Gate = new();
+    private static readonly SemaphoreSlim FileGate = new(1, 1);
     private static readonly Queue<LogEntry> SessionEntries = new();
     private static readonly Channel<LogEntry> FileEntries = Channel.CreateBounded<LogEntry>(
         new BoundedChannelOptions(10_000)
@@ -23,14 +26,15 @@ public static class AppLogger
 
     public static event Action<LogEntry>? EntryWritten;
 
-    static AppLogger() => _ = Task.Run(WriteFileEntriesAsync);
+    private static readonly Task FileWriterTask = Task.Run(WriteFileEntriesAsync);
 
     public static string LogPath =>
         System.IO.Path.Combine(AppContext.BaseDirectory, "SteamRecordingBrowser.log");
+    public static string LogDirectory => System.IO.Path.GetDirectoryName(LogPath)!;
 
     public static void Write(string message, string level = "INFO")
     {
-        var entry = new LogEntry(DateTime.Now, level.ToUpperInvariant(), message);
+        var entry = new LogEntry(DateTime.Now, level.ToUpperInvariant(), SanitizeMessage(message));
         try
         {
             lock (Gate)
@@ -55,9 +59,25 @@ public static class AppLogger
             {
                 try
                 {
-                    writer ??= new StreamWriter(new FileStream(LogPath, FileMode.Append, FileAccess.Write,
-                        FileShare.ReadWrite), new UTF8Encoding(false)) { AutoFlush = true };
-                    await writer.WriteLineAsync(entry.ToLogText());
+                    await FileGate.WaitAsync().ConfigureAwait(false);
+                    try
+                    {
+                        writer ??= CreateWriter();
+                        var line = entry.ToLogText();
+                        var lineBytes = Encoding.UTF8.GetByteCount(line) + Environment.NewLine.Length;
+                        if (writer.BaseStream.Length + lineBytes > MaximumLogFileBytes)
+                        {
+                            await writer.DisposeAsync().ConfigureAwait(false);
+                            writer = null;
+                            TryRotateArchives();
+                            writer = CreateWriter();
+                        }
+                        await writer.WriteLineAsync(line).ConfigureAwait(false);
+                    }
+                    finally
+                    {
+                        FileGate.Release();
+                    }
                 }
                 catch
                 {
@@ -72,6 +92,102 @@ public static class AppLogger
             if (writer is not null)
                 await writer.DisposeAsync();
         }
+    }
+
+    private static StreamWriter CreateWriter() =>
+        new(new FileStream(LogPath, FileMode.Append, FileAccess.Write, FileShare.ReadWrite),
+            new UTF8Encoding(false)) { AutoFlush = true };
+
+    private static bool TryRotateArchives()
+    {
+        var rotatingPath = LogPath + ".rotating";
+        try
+        {
+            if (File.Exists(rotatingPath))
+                File.Delete(rotatingPath);
+            if (File.Exists(LogPath))
+                File.Move(LogPath, rotatingPath);
+
+            var oldest = GetArchivePath(MaximumArchiveFiles);
+            if (File.Exists(oldest))
+                File.Delete(oldest);
+            for (var index = MaximumArchiveFiles - 1; index >= 1; index--)
+            {
+                var source = GetArchivePath(index);
+                if (File.Exists(source))
+                    File.Move(source, GetArchivePath(index + 1), overwrite: true);
+            }
+            if (File.Exists(rotatingPath))
+                File.Move(rotatingPath, GetArchivePath(1), overwrite: true);
+            return true;
+        }
+        catch
+        {
+            // A user may have a log open in an editor that does not permit
+            // renaming. Continue writing the active file and retry rotation
+            // on the next entry instead of losing diagnostics or crashing.
+            try
+            {
+                if (File.Exists(rotatingPath) && !File.Exists(LogPath))
+                    File.Move(rotatingPath, LogPath);
+            }
+            catch { }
+            return false;
+        }
+    }
+
+    private static string GetArchivePath(int index) =>
+        System.IO.Path.Combine(LogDirectory, $"SteamRecordingBrowser.{index}.log");
+
+    public static long GetLogStorageBytes()
+    {
+        try
+        {
+            return EnumerateManagedLogFiles().Where(File.Exists).Sum(path => new FileInfo(path).Length);
+        }
+        catch { return 0; }
+    }
+
+    public static async Task ClearArchivedLogsAsync()
+    {
+        await FileGate.WaitAsync().ConfigureAwait(false);
+        try
+        {
+            for (var index = 1; index <= MaximumArchiveFiles; index++)
+            {
+                var path = GetArchivePath(index);
+                if (File.Exists(path))
+                    File.Delete(path);
+            }
+        }
+        finally
+        {
+            FileGate.Release();
+        }
+    }
+
+    public static async Task FlushAndStopAsync()
+    {
+        FileEntries.Writer.TryComplete();
+        await FileWriterTask.ConfigureAwait(false);
+    }
+
+    private static IEnumerable<string> EnumerateManagedLogFiles()
+    {
+        yield return LogPath;
+        for (var index = 1; index <= MaximumArchiveFiles; index++)
+            yield return GetArchivePath(index);
+    }
+
+    private static string SanitizeMessage(string message)
+    {
+        var sanitized = message;
+        var userProfile = Environment.GetFolderPath(Environment.SpecialFolder.UserProfile);
+        if (!string.IsNullOrWhiteSpace(userProfile))
+            sanitized = sanitized.Replace(userProfile, "%USERPROFILE%", StringComparison.OrdinalIgnoreCase);
+        sanitized = Regex.Replace(sanitized,
+            @"(?i)(token|api[_-]?key|authorization|password)=([^\s&]+)", "$1=<redacted>");
+        return Regex.Replace(sanitized, @"(?i)(https?://[^\s?]+)\?[^\s]+", "$1?<redacted>");
     }
 
     public static void WriteException(string message, Exception ex) =>

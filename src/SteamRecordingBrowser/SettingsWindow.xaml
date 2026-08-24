@@ -146,6 +146,7 @@
             <RowDefinition Height="Auto"/>
             <RowDefinition Height="Auto"/>
             <RowDefinition Height="Auto"/>
+            <RowDefinition Height="Auto"/>
         </Grid.RowDefinitions>
 
         <StackPanel>
@@ -229,7 +230,37 @@
             </Grid>
         </Border>
 
-        <Border Grid.Row="4" Margin="0,14,0,22" Padding="20"
+        <Border Grid.Row="4" Margin="0,14,0,0" Padding="20"
+                MinHeight="118"
+                Background="#151922" BorderBrush="#2B3240"
+                BorderThickness="1" CornerRadius="7">
+            <Grid>
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="*"/>
+                    <ColumnDefinition Width="Auto"/>
+                </Grid.ColumnDefinitions>
+
+                <StackPanel VerticalAlignment="Center" Margin="0,0,20,0">
+                    <TextBlock Text="Application logs" FontSize="16" FontWeight="SemiBold"
+                               LineHeight="22"/>
+                    <TextBlock x:Name="LogStorageStatusText" Margin="0,8,0,0"
+                               Foreground="#98A2B3" FontSize="13"
+                               LineHeight="19" TextWrapping="Wrap"/>
+                    <TextBlock Text="Logs rotate at 10 MB and retain five archives."
+                               Margin="0,3,0,0" Foreground="#788394" FontSize="12"
+                               TextWrapping="Wrap"/>
+                </StackPanel>
+
+                <StackPanel Grid.Column="1" Orientation="Horizontal" VerticalAlignment="Center">
+                    <Button Content="Open folder" MinWidth="104" Margin="0,0,10,0"
+                            Click="OpenLogFolder_Click"/>
+                    <Button Content="Clear archives" MinWidth="112"
+                            Click="ClearArchivedLogs_Click"/>
+                </StackPanel>
+            </Grid>
+        </Border>
+
+        <Border Grid.Row="5" Margin="0,14,0,22" Padding="20"
                 MinHeight="112"
                 Background="#151922" BorderBrush="#2B3240"
                 BorderThickness="1" CornerRadius="7">
@@ -254,7 +285,7 @@
             </Grid>
         </Border>
 
-        <Button Grid.Row="5" Content="Close" Width="90"
+        <Button Grid.Row="6" Content="Close" Width="90"
                 HorizontalAlignment="Right" IsCancel="True"
                 Click="Close_Click"/>
     </Grid>

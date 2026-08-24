@@ -8,6 +8,8 @@ The project adopts semantic versioning beginning with **1.0.0**.
 
 ### Added
 
+- Added automatic 10 MB log rotation with five retained archives, log storage
+  usage, and archive-management controls in Settings.
 - Added automatic classification badges for Steam background recordings,
   actively recording sessions, and saved clips in list and tile layouts.
 - Added near-live playback for active rolling recordings through a local
@@ -20,6 +22,8 @@ The project adopts semantic versioning beginning with **1.0.0**.
 
 ### Fixed
 
+- Bounded total log storage, redacted common secrets and user-profile paths,
+  reduced repetitive native diagnostics, and flushes queued logs on shutdown.
 - Removed search typing lag by debouncing input, batching result updates,
   detaching the hidden clip layout, and coalescing timeline redraws.
 - Forced the complete native VLC window hierarchy to initialize and repaint in
