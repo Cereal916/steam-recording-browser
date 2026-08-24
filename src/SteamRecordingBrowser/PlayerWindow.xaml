@@ -198,13 +198,15 @@
             <vlc:VideoView x:Name="VideoView"
                            Focusable="False"
                            Background="#000000">
-                <!-- LibVLCSharp renders VideoView content in its foreground
-                     HWND, above the native Direct3D surface. Keep this cover
-                     visible until decoded timestamps advance so native white
-                     clears can never reach the user during source changes. -->
-                <Border x:Name="VideoTransitionCover"
-                        Background="#000000"
-                        IsHitTestVisible="False"/>
+                <Grid>
+                    <!-- LibVLCSharp renders VideoView content in its foreground
+                         HWND, above the native Direct3D surface. Keep this cover
+                         visible until decoded timestamps advance so native white
+                         clears can never reach the user during source changes. -->
+                    <Border x:Name="VideoTransitionCover"
+                            Background="#000000"
+                            IsHitTestVisible="False"/>
+                </Grid>
             </vlc:VideoView>
             <Border x:Name="LivePlaybackBadge"
                     Visibility="Collapsed"
@@ -490,11 +492,15 @@
 
             <Border Grid.Row="1" BorderBrush="#2B3240" BorderThickness="0,1,0,0">
                 <DockPanel Margin="12,8">
-                    <TextBlock x:Name="ClipInfoText"
-                               DockPanel.Dock="Left"
-                               VerticalAlignment="Center"
-                               Foreground="#98A2B3"
-                               Margin="2,0,16,0"/>
+                    <StackPanel DockPanel.Dock="Left" Orientation="Horizontal" VerticalAlignment="Center" Margin="2,0,16,0">
+                        <TextBlock x:Name="ClipInfoText" VerticalAlignment="Center" Foreground="#98A2B3"/>
+                        <Border x:Name="PlayerInfoBadge" Width="25" Height="25" Margin="9,0,0,0"
+                                Background="#E0151922" BorderBrush="#66758A" BorderThickness="1" CornerRadius="13"
+                                ToolTipService.ShowDuration="60000">
+                            <TextBlock Text="i" Foreground="#DDEEFF" FontSize="14" FontWeight="Bold" FontStyle="Italic"
+                                       HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                        </Border>
+                    </StackPanel>
 
                     <StackPanel DockPanel.Dock="Right"
                                 Orientation="Horizontal"

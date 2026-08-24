@@ -54,6 +54,64 @@ public sealed class DashCompatibilityService
         }
     }
 
+    public MediaTechnicalInfo GetMediaTechnicalInfo(string mpdPath)
+    {
+        try
+        {
+            var root = XDocument.Load(mpdPath).Root;
+            if (root is null) return MediaTechnicalInfo.Unknown;
+            var ns = root.Name.Namespace;
+            var representations = root.Descendants(ns + "Representation").ToList();
+            var video = representations.FirstOrDefault(rep => IsMediaType(rep, "video"));
+            var audio = representations.FirstOrDefault(rep => IsMediaType(rep, "audio"));
+            var videoCodec = FormatCodec(video?.Attribute("codecs")?.Value ?? video?.Parent?.Attribute("codecs")?.Value);
+            var audioCodec = FormatCodec(audio?.Attribute("codecs")?.Value ?? audio?.Parent?.Attribute("codecs")?.Value);
+            var width = video?.Attribute("width")?.Value;
+            var height = video?.Attribute("height")?.Value;
+            var resolution = !string.IsNullOrWhiteSpace(width) && !string.IsNullOrWhiteSpace(height)
+                ? $"{width}×{height}" : "Unknown";
+            var frameRate = FormatFrameRate(video?.Attribute("frameRate")?.Value ?? video?.Parent?.Attribute("frameRate")?.Value);
+            var bitrate = long.TryParse(video?.Attribute("bandwidth")?.Value, CultureInfo.InvariantCulture, out var bandwidth)
+                ? $"{bandwidth / 1_000_000d:0.##} Mbps" : "Unknown";
+            return new MediaTechnicalInfo(videoCodec, audioCodec, resolution, frameRate, bitrate);
+        }
+        catch (Exception ex)
+        {
+            AppLogger.Write($"Could not read media details for {mpdPath}: {ex.Message}", "WARN");
+            return MediaTechnicalInfo.Unknown;
+        }
+    }
+
+    private static bool IsMediaType(XElement representation, string type)
+    {
+        var contentType = representation.Attribute("contentType")?.Value ?? representation.Parent?.Attribute("contentType")?.Value;
+        var mimeType = representation.Attribute("mimeType")?.Value ?? representation.Parent?.Attribute("mimeType")?.Value;
+        return string.Equals(contentType, type, StringComparison.OrdinalIgnoreCase) ||
+               mimeType?.StartsWith(type + "/", StringComparison.OrdinalIgnoreCase) == true;
+    }
+
+    private static string FormatCodec(string? codec)
+    {
+        if (string.IsNullOrWhiteSpace(codec)) return "Unknown";
+        var normalized = codec.Trim().ToLowerInvariant();
+        if (normalized.StartsWith("avc1") || normalized.StartsWith("avc3")) return $"H.264 ({codec})";
+        if (normalized.StartsWith("hvc1") || normalized.StartsWith("hev1")) return $"HEVC / H.265 ({codec})";
+        if (normalized.StartsWith("av01")) return $"AV1 ({codec})";
+        if (normalized.StartsWith("mp4a")) return $"AAC ({codec})";
+        if (normalized.StartsWith("opus")) return "Opus";
+        return codec;
+    }
+
+    private static string FormatFrameRate(string? value)
+    {
+        if (string.IsNullOrWhiteSpace(value)) return "Unknown";
+        var parts = value.Split('/');
+        if (parts.Length == 2 && double.TryParse(parts[0], CultureInfo.InvariantCulture, out var numerator) &&
+            double.TryParse(parts[1], CultureInfo.InvariantCulture, out var denominator) && denominator > 0)
+            return $"{numerator / denominator:0.##} fps";
+        return double.TryParse(value, CultureInfo.InvariantCulture, out var fps) ? $"{fps:0.##} fps" : value;
+    }
+
     public double GetDurationSeconds(string mpdPath)
     {
         try
@@ -555,4 +613,9 @@ public sealed class DashCompatibilityService
 public sealed record VideoCodecInfo(string DisplayName, ExportVideoCodec? ExportCodec)
 {
     public static VideoCodecInfo Unknown { get; } = new("Unknown codec", null);
+}
+
+public sealed record MediaTechnicalInfo(string VideoCodec, string AudioCodec, string Resolution, string FrameRate, string Bitrate)
+{
+    public static MediaTechnicalInfo Unknown { get; } = new("Unknown", "Unknown", "Unknown", "Unknown", "Unknown");
 }

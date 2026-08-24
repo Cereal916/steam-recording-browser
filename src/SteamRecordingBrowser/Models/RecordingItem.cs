@@ -25,6 +25,12 @@ public sealed class RecordingItem : INotifyPropertyChanged
     public IReadOnlyList<string> SessionPaths { get; init; } = Array.Empty<string>();
     public IReadOnlyList<double> SessionStartOffsetsSeconds { get; init; } = Array.Empty<double>();
     public IReadOnlyList<DateTime> SessionStartTimes { get; init; } = Array.Empty<DateTime>();
+    public string VideoCodec { get; init; } = "Unknown";
+    public string AudioCodec { get; init; } = "Unknown";
+    public string Resolution { get; init; } = "Unknown";
+    public string FrameRate { get; init; } = "Unknown";
+    public string Bitrate { get; init; } = "Unknown";
+    public IReadOnlyList<string> SteamMetadata { get; init; } = Array.Empty<string>();
 
     public bool IsLive
     {
@@ -35,6 +41,7 @@ public sealed class RecordingItem : INotifyPropertyChanged
             _isLive = value;
             OnPropertyChanged();
             OnPropertyChanged(nameof(RecordingTypeLabel));
+            OnPropertyChanged(nameof(VideoInfoText));
         }
     }
 
@@ -44,6 +51,34 @@ public sealed class RecordingItem : INotifyPropertyChanged
     public string DisplayTime => Timestamp.ToString("MMM d, yyyy  h:mm:ss tt");
     public string DurationText => DurationSeconds > 0 ? FormatDuration(DurationSeconds) : "—";
     public string SizeText => FormatBytes(SizeBytes);
+    public string VideoInfoText
+    {
+        get
+        {
+            var lines = new List<string>
+            {
+                GameName,
+                $"Type: {RecordingTypeLabel}",
+                $"Recorded: {DisplayTime}",
+                $"Duration: {DurationText}",
+                $"Size: {SizeText}",
+                $"Video: {VideoCodec} • {Resolution} • {FrameRate}",
+                $"Video bitrate: {Bitrate}",
+                $"Audio: {AudioCodec}"
+            };
+            if (SessionPaths.Count > 1)
+                lines.Add($"Gameplay sessions: {SessionPaths.Count}");
+            if (SteamMetadata.Count > 0)
+            {
+                lines.Add("");
+                lines.Add("Steam metadata");
+                lines.AddRange(SteamMetadata.Select(value => $"• {value}"));
+            }
+            lines.Add("");
+            lines.Add($"Location: {Path}");
+            return string.Join(Environment.NewLine, lines);
+        }
+    }
 
     public bool IsFavorite
     {

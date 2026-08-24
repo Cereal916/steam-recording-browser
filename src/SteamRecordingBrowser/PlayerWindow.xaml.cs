@@ -132,6 +132,7 @@ private readonly DispatcherTimer _hoverFramePauseTimer;
         _item = item;
 
         Title = $"Steam Recording Browser — {item.GameName}";
+        PlayerInfoBadge.ToolTip = item.VideoInfoText;
         ClipInfoText.Text = $"{item.GameName}  •  {item.DisplayTime}  •  {item.RecordingTypeLabel}";
         LivePlaybackBadge.Visibility = item.IsLive ? Visibility.Visible : Visibility.Collapsed;
         GoLiveButton.Visibility = item.IsLive ? Visibility.Visible : Visibility.Collapsed;

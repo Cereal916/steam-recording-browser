@@ -112,6 +112,8 @@
         </Style>
 
         <Style TargetType="ToolTip">
+            <Setter Property="MaxWidth" Value="560"/>
+            <Setter Property="TextBlock.TextWrapping" Value="Wrap"/>
             <Setter Property="Foreground" Value="#F4F7FB"/>
             <Setter Property="Background" Value="#151922"/>
             <Setter Property="BorderBrush" Value="#3A4353"/>

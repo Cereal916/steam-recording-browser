@@ -104,6 +104,7 @@ public sealed class RecordingScanner
         if (durationSeconds <= 0 && match.Success && !isSavedClip &&
             LiveRecordingService.IsActivelyRecording(mpdPath))
             durationSeconds = LiveRecordingService.GetDynamicDurationSeconds(mpdPath);
+        var technicalInfo = _dash.GetMediaTechnicalInfo(mpdPath);
 
         return new RecordingItem
         {
@@ -120,7 +121,13 @@ public sealed class RecordingScanner
             IsLive = match.Success && !isSavedClip && LiveRecordingService.IsActivelyRecording(mpdPath),
             SessionPaths = new[] { mpdPath },
             SessionStartOffsetsSeconds = new[] { 0d },
-            SessionStartTimes = new[] { timestamp }
+            SessionStartTimes = new[] { timestamp },
+            VideoCodec = technicalInfo.VideoCodec,
+            AudioCodec = technicalInfo.AudioCodec,
+            Resolution = technicalInfo.Resolution,
+            FrameRate = technicalInfo.FrameRate,
+            Bitrate = technicalInfo.Bitrate,
+            SteamMetadata = SteamClipMetadataService.ReadForRecording(mpdPath)
         };
     }
 
@@ -157,6 +164,13 @@ public sealed class RecordingScanner
                 SessionPaths = sessions.Select(session => session.Path).ToArray(),
                 SessionStartOffsetsSeconds = offsets,
                 SessionStartTimes = sessions.Select(session => session.Timestamp).ToArray(),
+                VideoCodec = primary.VideoCodec,
+                AudioCodec = primary.AudioCodec,
+                Resolution = primary.Resolution,
+                FrameRate = primary.FrameRate,
+                Bitrate = primary.Bitrate,
+                SteamMetadata = sessions.SelectMany(session => session.SteamMetadata)
+                    .Distinct(StringComparer.OrdinalIgnoreCase).ToArray(),
                 IsFavorite = sessions.Any(session => session.IsFavorite),
                 Description = primary.Description,
                 Tags = sessions.SelectMany(session => session.Tags)
