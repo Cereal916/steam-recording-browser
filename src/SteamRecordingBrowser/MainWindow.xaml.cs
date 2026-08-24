@@ -16,6 +16,7 @@ using WpfMessageBoxImage = System.Windows.MessageBoxImage;
 using SteamRecordingBrowser.Dialogs;
 using SteamRecordingBrowser.Models;
 using SteamRecordingBrowser.Services;
+using SteamRecordingBrowser.Utilities;
 
 namespace SteamRecordingBrowser;
 
@@ -40,7 +41,7 @@ public partial class MainWindow : Window
     }
 
     private readonly List<RecordingItem> _allItems = new();
-    private readonly ObservableCollection<RecordingItem> _visibleItems = new();
+    private readonly BulkObservableCollection<RecordingItem> _visibleItems = new();
 
     private CancellationTokenSource? _scanCancellation;
     private string _selectedGameId = "";
@@ -49,6 +50,8 @@ public partial class MainWindow : Window
     private string _recordingRoot = "";
     private bool _clipLayoutChangedFromSettings;
     private LogViewerWindow? _logViewer;
+    private DispatcherTimer? _searchFilterTimer;
+    private DispatcherOperation? _dateTimelineUpdateOperation;
 
     private async void Settings_Click(object sender, RoutedEventArgs e)
     {
@@ -71,6 +74,7 @@ public partial class MainWindow : Window
     private long _clipPreviewGeneration;
     private long _clipPreviewRevealGeneration;
     private bool _clipPreviewRevealPending;
+    private bool _liveStateRefreshPending;
 
     public MainWindow(IProgress<StartupProgress>? startupProgress = null)
     {
@@ -99,16 +103,20 @@ public partial class MainWindow : Window
         };
         _clipPreviewDelayTimer.Tick += ClipPreviewDelayTimer_Tick;
 
+        _searchFilterTimer = new DispatcherTimer
+        {
+            Interval = TimeSpan.FromMilliseconds(225)
+        };
+        _searchFilterTimer.Tick += SearchFilterTimer_Tick;
+
         _liveRecordingTimer = new DispatcherTimer { Interval = TimeSpan.FromSeconds(2) };
-        _liveRecordingTimer.Tick += (_, _) => RefreshLiveRecordingStates();
+        _liveRecordingTimer.Tick += async (_, _) => await RefreshLiveRecordingStatesAsync();
         _liveRecordingTimer.Start();
 
         _clipPreviewPlayer.EncounteredError += ClipPreviewPlayer_EncounteredError;
         _clipPreviewPlayer.EndReached += ClipPreviewPlayer_EndReached;
         _clipPreviewPlayer.TimeChanged += ClipPreviewPlayer_TimeChanged;
 
-        RecordingList.ItemsSource = _visibleItems;
-        TileRecordingList.ItemsSource = _visibleItems;
         ApplyClipLayout();
 
         SortFilter.ItemsSource = new[] { "Newest", "Oldest", "Largest", "Smallest" };
@@ -154,6 +162,9 @@ public partial class MainWindow : Window
 
             _clipPreviewDelayTimer.Stop();
             _clipPreviewDelayTimer.Tick -= ClipPreviewDelayTimer_Tick;
+            _searchFilterTimer?.Stop();
+            if (_searchFilterTimer is not null)
+                _searchFilterTimer.Tick -= SearchFilterTimer_Tick;
             _clipPreviewPlayer.EncounteredError -= ClipPreviewPlayer_EncounteredError;
             _clipPreviewPlayer.EndReached -= ClipPreviewPlayer_EndReached;
             _clipPreviewPlayer.TimeChanged -= ClipPreviewPlayer_TimeChanged;
@@ -167,10 +178,27 @@ public partial class MainWindow : Window
 
     }
 
-    private void RefreshLiveRecordingStates()
+    private async Task RefreshLiveRecordingStatesAsync()
     {
-        foreach (var item in _allItems.Where(item => item.IsAutoRecording))
-            item.IsLive = item.SessionPaths.Any(LiveRecordingService.IsActivelyRecording);
+        if (_liveStateRefreshPending)
+            return;
+
+        _liveStateRefreshPending = true;
+        try
+        {
+            var items = _allItems.Where(item => item.IsAutoRecording)
+                .Select(item => (Item: item, Paths: item.SessionPaths.ToArray()))
+                .ToArray();
+            var states = await Task.Run(() => items
+                .Select(entry => entry.Paths.Any(LiveRecordingService.IsActivelyRecording))
+                .ToArray());
+            for (var index = 0; index < items.Length; index++)
+                items[index].Item.IsLive = states[index];
+        }
+        finally
+        {
+            _liveStateRefreshPending = false;
+        }
     }
 
     private async Task LoadRecordingsAsync(bool isInitialLoad = false)
@@ -300,6 +328,7 @@ public partial class MainWindow : Window
 
     private void ApplyFilter()
     {
+        _searchFilterTimer?.Stop();
         IEnumerable<RecordingItem> query = _allItems;
 
         if (!string.IsNullOrWhiteSpace(_selectedGameId))
@@ -332,12 +361,10 @@ public partial class MainWindow : Window
             _ => query.OrderByDescending(x => x.Timestamp)
         };
 
-        _visibleItems.Clear();
-        foreach (var item in query)
-            _visibleItems.Add(item);
+        _visibleItems.ReplaceAll(query);
 
         UpdateFilterStatus();
-        Dispatcher.BeginInvoke(DispatcherPriority.Render, new Action(UpdateDateTimeline));
+        ScheduleDateTimelineUpdate();
     }
 
     private void UpdateGameFilter()
@@ -833,6 +860,13 @@ public partial class MainWindow : Window
             ? Visibility.Visible
             : Visibility.Collapsed;
 
+        _searchFilterTimer?.Stop();
+        _searchFilterTimer?.Start();
+    }
+
+    private void SearchFilterTimer_Tick(object? sender, EventArgs e)
+    {
+        _searchFilterTimer?.Stop();
         ApplyFilter();
     }
 
@@ -936,10 +970,13 @@ public partial class MainWindow : Window
     private void ApplyClipLayout()
     {
         var useTiles = _settings.Load().UseTileLayout;
+        StopClipPreview(closePopup: true);
         ListLayoutPanel.Visibility = useTiles ? Visibility.Collapsed : Visibility.Visible;
         TileLayoutPanel.Visibility = useTiles ? Visibility.Visible : Visibility.Collapsed;
+        RecordingList.ItemsSource = useTiles ? null : _visibleItems;
+        TileRecordingList.ItemsSource = useTiles ? _visibleItems : null;
 
-        Dispatcher.BeginInvoke(DispatcherPriority.Render, new Action(UpdateDateTimeline));
+        ScheduleDateTimelineUpdate();
     }
 
     private async Task ApplyClipLayoutTransitionAsync()
@@ -962,7 +999,21 @@ public partial class MainWindow : Window
     }
 
     private void DateTimelineCanvas_SizeChanged(object sender, SizeChangedEventArgs e) =>
-        UpdateDateTimeline();
+        ScheduleDateTimelineUpdate();
+
+    private void ScheduleDateTimelineUpdate()
+    {
+        if (_dateTimelineUpdateOperation is { Status: DispatcherOperationStatus.Pending })
+            return;
+
+        _dateTimelineUpdateOperation = Dispatcher.BeginInvoke(
+            DispatcherPriority.Render,
+            new Action(() =>
+            {
+                _dateTimelineUpdateOperation = null;
+                UpdateDateTimeline();
+            }));
+    }
 
     private void UpdateDateTimeline()
     {

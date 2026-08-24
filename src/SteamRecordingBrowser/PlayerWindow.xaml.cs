@@ -524,10 +524,20 @@ private readonly DispatcherTimer _hoverFramePauseTimer;
         AppLogger.Write($"Video transition cover shown: {reason}.", "DEBUG");
     }
 
-    private void Player_Opening(object? sender, EventArgs e) =>
+    private void Player_Opening(object? sender, EventArgs e)
+    {
         AppLogger.Write(
             $"Main player opening media. mode={(_followingLive ? "dynamic-live" : "history")} " +
             $"time={_player.Time}ms length={_player.Length}ms state={_player.State}", "DEBUG");
+        Dispatcher.BeginInvoke(DispatcherPriority.Send, new Action(() =>
+            ConfigureNativeVideoHost(VideoView, _player)));
+        _ = Dispatcher.BeginInvoke(DispatcherPriority.Render, new Action(async () =>
+        {
+            await Task.Delay(100);
+            if (IsLoaded)
+                ConfigureNativeVideoHost(VideoView, _player);
+        }));
+    }
 
     private void Player_Buffering(object? sender, MediaPlayerBufferingEventArgs e)
     {
@@ -543,10 +553,14 @@ private readonly DispatcherTimer _hoverFramePauseTimer;
             $"cache={e.Cache:F1}% time={_player.Time}ms length={_player.Length}ms state={_player.State}", "DEBUG");
     }
 
-    private void Player_Stopped(object? sender, EventArgs e) =>
+    private void Player_Stopped(object? sender, EventArgs e)
+    {
         AppLogger.Write(
             $"Main player stopped. mode={(_followingLive ? "dynamic-live" : "history")} " +
             $"time={_player.Time}ms length={_player.Length}ms state={_player.State}", "DEBUG");
+        Dispatcher.BeginInvoke(DispatcherPriority.Send, new Action(() =>
+            ConfigureNativeVideoHost(VideoView, _player)));
+    }
 
     private void SeekToLiveEdge()
     {
@@ -1167,6 +1181,25 @@ private readonly DispatcherTimer _hoverFramePauseTimer;
     [return: MarshalAs(UnmanagedType.Bool)]
     private static extern bool InvalidateRect(IntPtr hWnd, IntPtr lpRect, bool bErase);
 
+    private delegate bool EnumWindowsProc(IntPtr hWnd, IntPtr lParam);
+
+    [DllImport("user32.dll")]
+    [return: MarshalAs(UnmanagedType.Bool)]
+    private static extern bool EnumChildWindows(IntPtr hWndParent, EnumWindowsProc lpEnumFunc, IntPtr lParam);
+
+    [DllImport("user32.dll")]
+    private static extern IntPtr GetDC(IntPtr hWnd);
+
+    [DllImport("user32.dll")]
+    private static extern int ReleaseDC(IntPtr hWnd, IntPtr hDC);
+
+    [DllImport("user32.dll")]
+    [return: MarshalAs(UnmanagedType.Bool)]
+    private static extern bool GetClientRect(IntPtr hWnd, out NativeRect lpRect);
+
+    [DllImport("user32.dll")]
+    private static extern int FillRect(IntPtr hDC, [In] ref NativeRect lprc, IntPtr hbr);
+
     private static bool ConfigureNativeVideoHost(Control view, MediaPlayer? player = null)
     {
         const int gclpBackgroundBrush = -10;
@@ -1182,10 +1215,30 @@ private readonly DispatcherTimer _hoverFramePauseTimer;
 
         if (player is not null)
             player.Hwnd = host.Handle;
-        SetClassLongPtr(host.Handle, gclpBackgroundBrush, GetStockObject(blackBrush));
-        InvalidateRect(host.Handle, IntPtr.Zero, true);
+        var brush = GetStockObject(blackBrush);
+        PaintNativeVideoWindowBlack(host.Handle, brush, gclpBackgroundBrush);
+        EnumChildWindows(host.Handle, (child, _) =>
+        {
+            PaintNativeVideoWindowBlack(child, brush, gclpBackgroundBrush);
+            return true;
+        }, IntPtr.Zero);
         AppLogger.Write($"Native libVLC video host background set to black. hwnd=0x{host.Handle.ToInt64():X}", "DEBUG");
         return true;
+    }
+
+    private static void PaintNativeVideoWindowBlack(IntPtr hwnd, IntPtr brush, int backgroundBrushIndex)
+    {
+        SetClassLongPtr(hwnd, backgroundBrushIndex, brush);
+        if (GetClientRect(hwnd, out var rect))
+        {
+            var dc = GetDC(hwnd);
+            if (dc != IntPtr.Zero)
+            {
+                FillRect(dc, ref rect, brush);
+                ReleaseDC(hwnd, dc);
+            }
+        }
+        InvalidateRect(hwnd, IntPtr.Zero, true);
     }
 
     private void TogglePlayback(string source)

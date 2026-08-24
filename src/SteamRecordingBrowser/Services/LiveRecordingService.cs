@@ -1,14 +1,33 @@
 using System.IO;
 using System.Globalization;
 using System.Xml.Linq;
+using System.Collections.Concurrent;
 
 namespace SteamRecordingBrowser.Services;
 
 public static class LiveRecordingService
 {
     private static readonly TimeSpan ActiveWriteWindow = TimeSpan.FromSeconds(8);
+    private static readonly TimeSpan ActivityCacheLifetime = TimeSpan.FromSeconds(1);
+    private static readonly ConcurrentDictionary<string, ActivityCacheEntry> ActivityCache =
+        new(StringComparer.OrdinalIgnoreCase);
 
     public static bool IsActivelyRecording(string manifestPath)
+    {
+        var fullPath = Path.GetFullPath(manifestPath);
+        var now = DateTime.UtcNow;
+        var manifestWriteUtc = File.Exists(fullPath) ? File.GetLastWriteTimeUtc(fullPath) : DateTime.MinValue;
+        if (ActivityCache.TryGetValue(fullPath, out var cached) &&
+            cached.ManifestWriteUtc == manifestWriteUtc &&
+            now - cached.CheckedAtUtc < ActivityCacheLifetime)
+            return cached.IsActive;
+
+        var isActive = DetectActiveRecording(fullPath, now);
+        ActivityCache[fullPath] = new ActivityCacheEntry(now, manifestWriteUtc, isActive);
+        return isActive;
+    }
+
+    private static bool DetectActiveRecording(string manifestPath, DateTime now)
     {
         try
         {
@@ -28,14 +47,15 @@ public static class LiveRecordingService
                     newestWrite = write;
             }
 
-            return newestWrite != DateTime.MinValue &&
-                   DateTime.UtcNow - newestWrite <= ActiveWriteWindow;
+            return newestWrite != DateTime.MinValue && now - newestWrite <= ActiveWriteWindow;
         }
         catch
         {
             return false;
         }
     }
+
+    private sealed record ActivityCacheEntry(DateTime CheckedAtUtc, DateTime ManifestWriteUtc, bool IsActive);
 
     public static double GetDynamicDurationSeconds(string manifestPath)
     {

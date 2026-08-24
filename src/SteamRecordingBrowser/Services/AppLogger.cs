@@ -1,6 +1,7 @@
 using System.IO;
 using System.Text;
 using System.Text.RegularExpressions;
+using System.Threading.Channels;
 
 namespace SteamRecordingBrowser.Services;
 
@@ -9,11 +10,20 @@ public static class AppLogger
     private const int MaximumSessionEntries = 5_000;
     private static readonly object Gate = new();
     private static readonly Queue<LogEntry> SessionEntries = new();
+    private static readonly Channel<LogEntry> FileEntries = Channel.CreateBounded<LogEntry>(
+        new BoundedChannelOptions(10_000)
+        {
+            SingleReader = true,
+            SingleWriter = false,
+            FullMode = BoundedChannelFullMode.DropOldest
+        });
     private static readonly Regex LogLinePattern = new(
         @"^\[(?<timestamp>[^\]]+)\] \[(?<level>[^\]]+)\] (?<message>.*)$",
         RegexOptions.Compiled);
 
     public static event Action<LogEntry>? EntryWritten;
+
+    static AppLogger() => _ = Task.Run(WriteFileEntriesAsync);
 
     public static string LogPath =>
         System.IO.Path.Combine(AppContext.BaseDirectory, "SteamRecordingBrowser.log");
@@ -25,18 +35,43 @@ public static class AppLogger
         {
             lock (Gate)
             {
-                File.AppendAllText(
-                    LogPath,
-                    entry.ToLogText() + Environment.NewLine,
-                    new UTF8Encoding(false));
                 if (SessionEntries.Count == MaximumSessionEntries)
                     SessionEntries.Dequeue();
                 SessionEntries.Enqueue(entry);
             }
 
+            FileEntries.Writer.TryWrite(entry);
             try { EntryWritten?.Invoke(entry); } catch { }
         }
         catch { }
+    }
+
+    private static async Task WriteFileEntriesAsync()
+    {
+        StreamWriter? writer = null;
+        try
+        {
+            await foreach (var entry in FileEntries.Reader.ReadAllAsync())
+            {
+                try
+                {
+                    writer ??= new StreamWriter(new FileStream(LogPath, FileMode.Append, FileAccess.Write,
+                        FileShare.ReadWrite), new UTF8Encoding(false)) { AutoFlush = true };
+                    await writer.WriteLineAsync(entry.ToLogText());
+                }
+                catch
+                {
+                    if (writer is not null)
+                        await writer.DisposeAsync();
+                    writer = null;
+                }
+            }
+        }
+        finally
+        {
+            if (writer is not null)
+                await writer.DisposeAsync();
+        }
     }
 
     public static void WriteException(string message, Exception ex) =>

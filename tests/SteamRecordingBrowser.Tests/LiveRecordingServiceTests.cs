@@ -46,6 +46,20 @@ public sealed class LiveRecordingServiceTests
     }
 
     [Fact]
+    public void GetDurationSeconds_UsesDeclaredDurationForInactiveDynamicManifest()
+    {
+        using var recording = new TemporaryRecording(Manifest);
+        var segmentPath = Path.Combine(recording.DirectoryPath, "init-stream0.m4s");
+        File.WriteAllBytes(segmentPath, [0, 1, 2]);
+        File.SetLastWriteTimeUtc(recording.ManifestPath, DateTime.UtcNow.AddMinutes(-1));
+        File.SetLastWriteTimeUtc(segmentPath, DateTime.UtcNow.AddMinutes(-1));
+
+        var duration = new DashCompatibilityService().GetDurationSeconds(recording.ManifestPath);
+
+        Assert.Equal(20, duration);
+    }
+
+    [Fact]
     public void CreateLiveManifest_AdvancesPastSegmentsRemovedFromRollingBuffer()
     {
         using var recording = new TemporaryRecording(Manifest);

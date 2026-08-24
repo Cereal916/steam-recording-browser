@@ -60,7 +60,8 @@ public sealed class DashCompatibilityService
         {
             var doc = XDocument.Load(mpdPath);
             var mpd = doc.Root;
-            if (string.Equals(mpd?.Attribute("type")?.Value, "dynamic", StringComparison.OrdinalIgnoreCase))
+            if (string.Equals(mpd?.Attribute("type")?.Value, "dynamic", StringComparison.OrdinalIgnoreCase) &&
+                LiveRecordingService.IsActivelyRecording(mpdPath))
             {
                 var liveDuration = LiveRecordingService.GetDynamicDurationSeconds(mpdPath);
                 if (liveDuration > 0)

@@ -20,6 +20,13 @@ The project adopts semantic versioning beginning with **1.0.0**.
 
 ### Fixed
 
+- Removed search typing lag by debouncing input, batching result updates,
+  detaching the hidden clip layout, and coalescing timeline redraws.
+- Forced the complete native VLC window hierarchy to initialize and repaint in
+  black during media startup and Live transitions, preventing white flashes.
+- Corrected durations for finalized dynamic manifests, moved live-state scans
+  off the UI thread with shared caching, and made native VLC log persistence
+  asynchronous to avoid playback and scrolling stalls.
 - Delayed enlarged clip previews until a card has been continuously hovered for
   half a second, avoiding popup and decoder churn while scrolling tile view.
 - Restored hardware decoding for high-bitrate live HEVC playback, increased
