@@ -261,7 +261,6 @@
                     <Canvas x:Name="TimelineTickCanvas"
                             Grid.Row="1"
                             Height="18"
-                            IsHitTestVisible="False"
                             SizeChanged="TimelineTickCanvas_SizeChanged"/>
 
                     <Button x:Name="TimeButton"

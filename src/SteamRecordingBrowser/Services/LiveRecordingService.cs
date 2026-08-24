@@ -2,6 +2,7 @@ using System.IO;
 using System.Globalization;
 using System.Xml.Linq;
 using System.Collections.Concurrent;
+using System.Text.RegularExpressions;
 
 namespace SteamRecordingBrowser.Services;
 
@@ -36,7 +37,8 @@ public static class LiveRecordingService
                 return false;
 
             var root = XDocument.Load(manifestPath).Root;
-            if (!string.Equals(root?.Attribute("type")?.Value, "dynamic", StringComparison.OrdinalIgnoreCase))
+            if (root is null ||
+                !string.Equals(root.Attribute("type")?.Value, "dynamic", StringComparison.OrdinalIgnoreCase))
                 return false;
 
             var newestWrite = DateTime.MinValue;
@@ -62,8 +64,15 @@ public static class LiveRecordingService
         try
         {
             var root = XDocument.Load(manifestPath).Root;
-            if (!string.Equals(root?.Attribute("type")?.Value, "dynamic", StringComparison.OrdinalIgnoreCase) ||
-                !DateTime.TryParse(root?.Attribute("availabilityStartTime")?.Value,
+            if (root is null ||
+                !string.Equals(root.Attribute("type")?.Value, "dynamic", StringComparison.OrdinalIgnoreCase))
+                return 0;
+
+            var retainedDuration = GetRetainedSegmentDuration(root, Path.GetDirectoryName(manifestPath)!);
+            if (retainedDuration > 0)
+                return Math.Min(retainedDuration, 2 * 60 * 60);
+
+            if (!DateTime.TryParse(root.Attribute("availabilityStartTime")?.Value,
                     CultureInfo.InvariantCulture, DateTimeStyles.AssumeUniversal, out var start))
                 return 0;
 
@@ -74,4 +83,44 @@ public static class LiveRecordingService
             return 0;
         }
     }
+
+    private static double GetRetainedSegmentDuration(XElement root, string directory)
+    {
+        var ns = root.Name.Namespace;
+        var videoSet = root.Descendants(ns + "AdaptationSet")
+            .FirstOrDefault(element => string.Equals(element.Attribute("contentType")?.Value,
+                "video", StringComparison.OrdinalIgnoreCase));
+        var representation = videoSet?.Elements(ns + "Representation").FirstOrDefault();
+        var template = representation?.Element(ns + "SegmentTemplate")
+                       ?? videoSet?.Element(ns + "SegmentTemplate");
+        if (representation is null || template is null)
+            return 0;
+
+        var media = template.Attribute("media")?.Value;
+        var representationId = representation.Attribute("id")?.Value ?? "";
+        if (string.IsNullOrWhiteSpace(media))
+            return 0;
+
+        var fileTemplate = media.Replace("$RepresentationID$", representationId, StringComparison.Ordinal);
+        var numberToken = Regex.Match(fileTemplate, @"\$Number(?:%0\d+d)?\$");
+        if (!numberToken.Success)
+            return 0;
+
+        var prefix = fileTemplate[..numberToken.Index];
+        var suffix = fileTemplate[(numberToken.Index + numberToken.Length)..];
+        var segmentCount = Directory.EnumerateFiles(directory, prefix + "*" + suffix,
+                SearchOption.TopDirectoryOnly)
+            .Count();
+        if (segmentCount == 0)
+            return 0;
+
+        var timescale = ReadPositiveLong(template.Attribute("timescale")?.Value, 1);
+        var duration = ReadPositiveLong(template.Attribute("duration")?.Value, 0);
+        return duration > 0 ? segmentCount * duration / (double)timescale : 0;
+    }
+
+    private static long ReadPositiveLong(string? value, long fallback) =>
+        long.TryParse(value, NumberStyles.Integer, CultureInfo.InvariantCulture, out var parsed) && parsed > 0
+            ? parsed
+            : fallback;
 }

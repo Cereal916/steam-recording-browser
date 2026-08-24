@@ -111,6 +111,28 @@
             </Setter>
         </Style>
 
+        <Style TargetType="ToolTip">
+            <Setter Property="Foreground" Value="#F4F7FB"/>
+            <Setter Property="Background" Value="#151922"/>
+            <Setter Property="BorderBrush" Value="#3A4353"/>
+            <Setter Property="BorderThickness" Value="1"/>
+            <Setter Property="Padding" Value="10,7"/>
+            <Setter Property="HasDropShadow" Value="True"/>
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="ToolTip">
+                        <Border Background="{TemplateBinding Background}"
+                                BorderBrush="{TemplateBinding BorderBrush}"
+                                BorderThickness="{TemplateBinding BorderThickness}"
+                                CornerRadius="5"
+                                Padding="{TemplateBinding Padding}">
+                            <ContentPresenter/>
+                        </Border>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+        </Style>
+
         <Style TargetType="ContextMenu">
             <Setter Property="Foreground" Value="#F4F7FB"/>
             <Setter Property="Background" Value="#151922"/>

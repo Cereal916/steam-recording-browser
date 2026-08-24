@@ -72,7 +72,7 @@ public sealed class DashCompatibilityService
             var ns = mpd?.Name.Namespace ?? XNamespace.None;
             var periodStart = ParseIsoDuration(mpd?.Elements(ns + "Period").FirstOrDefault()
                 ?.Attribute("start")?.Value);
-            return Math.Max(0, totalSeconds - periodStart);
+            return GetPlayableDurationSeconds(totalSeconds, periodStart);
         }
         catch (Exception ex)
         {
@@ -155,7 +155,7 @@ public sealed class DashCompatibilityService
                      ?? throw new InvalidDataException("MPD has no Period element.");
         var sourceDurationSeconds = ParseIsoDuration(root.Attribute("mediaPresentationDuration")?.Value);
         var periodStart = ParseIsoDuration(period.Attribute("start")?.Value);
-        var durationSeconds = Math.Max(0, sourceDurationSeconds - periodStart);
+        var durationSeconds = GetPlayableDurationSeconds(sourceDurationSeconds, periodStart);
         var durationText = durationSeconds > 0
             ? System.Xml.XmlConvert.ToString(TimeSpan.FromSeconds(durationSeconds))
             : null;
@@ -530,6 +530,20 @@ public sealed class DashCompatibilityService
 
         try { return System.Xml.XmlConvert.ToTimeSpan(value).TotalSeconds; }
         catch { return 0; }
+    }
+
+    private static double GetPlayableDurationSeconds(double presentationDuration, double periodStart)
+    {
+        if (presentationDuration <= 0)
+            return 0;
+
+        // Steam's finalized rolling manifests retain the original presentation
+        // offset even though mediaPresentationDuration already describes only
+        // the playable retained window. Subtract only for conventional MPDs
+        // where the period actually fits inside the presentation duration.
+        return periodStart > 0 && periodStart < presentationDuration
+            ? presentationDuration - periodStart
+            : presentationDuration;
     }
 
     private sealed class Utf8StringWriter : StringWriter

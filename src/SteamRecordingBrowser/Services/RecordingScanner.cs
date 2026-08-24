@@ -74,10 +74,13 @@ public sealed class RecordingScanner
                 match.Groups[2].Value + match.Groups[3].Value,
                 "yyyyMMddHHmmss",
                 System.Globalization.CultureInfo.InvariantCulture,
-                System.Globalization.DateTimeStyles.None,
+                System.Globalization.DateTimeStyles.AssumeUniversal |
+                System.Globalization.DateTimeStyles.AdjustToUniversal,
                 out var parsed))
             {
-                timestamp = parsed;
+                // Steam encodes background-recording folder timestamps in UTC.
+                // RecordingItem timestamps are displayed as local wall-clock time.
+                timestamp = parsed.ToLocalTime();
             }
         }
 
@@ -98,7 +101,8 @@ public sealed class RecordingScanner
             : gameId.Length > 0 ? $"App {gameId}" : "Unknown game";
 
         var durationSeconds = _dash.GetDurationSeconds(mpdPath);
-        if (durationSeconds <= 0 && match.Success && !isSavedClip)
+        if (durationSeconds <= 0 && match.Success && !isSavedClip &&
+            LiveRecordingService.IsActivelyRecording(mpdPath))
             durationSeconds = LiveRecordingService.GetDynamicDurationSeconds(mpdPath);
 
         return new RecordingItem
@@ -115,7 +119,8 @@ public sealed class RecordingScanner
             IsAutoRecording = match.Success && !isSavedClip,
             IsLive = match.Success && !isSavedClip && LiveRecordingService.IsActivelyRecording(mpdPath),
             SessionPaths = new[] { mpdPath },
-            SessionStartOffsetsSeconds = new[] { 0d }
+            SessionStartOffsetsSeconds = new[] { 0d },
+            SessionStartTimes = new[] { timestamp }
         };
     }
 
@@ -151,6 +156,7 @@ public sealed class RecordingScanner
                 IsLive = sessions.Any(session => session.IsLive),
                 SessionPaths = sessions.Select(session => session.Path).ToArray(),
                 SessionStartOffsetsSeconds = offsets,
+                SessionStartTimes = sessions.Select(session => session.Timestamp).ToArray(),
                 IsFavorite = sessions.Any(session => session.IsFavorite),
                 Description = primary.Description,
                 Tags = sessions.SelectMany(session => session.Tags)

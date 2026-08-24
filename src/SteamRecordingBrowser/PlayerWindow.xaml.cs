@@ -2573,9 +2573,26 @@ private readonly DispatcherTimer _hoverFramePauseTimer;
         if (_item.SessionStartOffsetsSeconds.Count > 1 && _item.DurationSeconds > 0)
         {
             var sessionBrush = new SolidColorBrush(MediaColor.FromRgb(102, 192, 244));
-            foreach (var offsetSeconds in _item.SessionStartOffsetsSeconds.Skip(1))
+            for (var sessionIndex = 1; sessionIndex < _item.SessionStartOffsetsSeconds.Count; sessionIndex++)
             {
+                var offsetSeconds = _item.SessionStartOffsetsSeconds[sessionIndex];
+                var sessionStart = sessionIndex < _item.SessionStartTimes.Count
+                    ? _item.SessionStartTimes[sessionIndex]
+                    : _item.Timestamp.AddSeconds(offsetSeconds);
+                var sessionToolTip = $"New gameplay session\n{sessionStart:MMM d, yyyy 'at' h:mm:ss tt}";
                 var x = Math.Clamp(offsetSeconds / _item.DurationSeconds * width, 0, width);
+
+                var hoverTarget = new System.Windows.Shapes.Rectangle
+                {
+                    Width = 18,
+                    Height = 18,
+                    Fill = System.Windows.Media.Brushes.Transparent,
+                    ToolTip = sessionToolTip
+                };
+                Canvas.SetLeft(hoverTarget, Math.Clamp(x - hoverTarget.Width / 2d, 0, Math.Max(0, width - hoverTarget.Width)));
+                Canvas.SetTop(hoverTarget, 0);
+                TimelineTickCanvas.Children.Add(hoverTarget);
+
                 TimelineTickCanvas.Children.Add(new Line
                 {
                     X1 = x,
@@ -2584,11 +2601,12 @@ private readonly DispatcherTimer _hoverFramePauseTimer;
                     Y2 = 18,
                     Stroke = sessionBrush,
                     StrokeThickness = 2.5,
-                    ToolTip = "New gameplay session"
+                    IsHitTestVisible = false
                 });
                 var marker = new Polygon
                 {
                     Fill = sessionBrush,
+                    IsHitTestVisible = false,
                     Points = new System.Windows.Media.PointCollection
                     {
                         new(-4, 0), new(4, 0), new(0, 5)

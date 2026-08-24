@@ -10,6 +10,7 @@ The project adopts semantic versioning beginning with **1.0.0**.
 
 ### Added
 
+- Added local date and time details to gameplay-session marker tooltips.
 - Added automatic 10 MB log rotation with five retained archives, log storage
   usage, and archive-management controls in Settings.
 - Added automatic classification badges for Steam background recordings,
@@ -24,6 +25,8 @@ The project adopts semantic versioning beginning with **1.0.0**.
 
 ### Fixed
 
+- Fixed restarted games showing only the newest session length by preserving
+  Steam's finalized rolling-window duration and measuring active retained segments.
 - Bounded total log storage, redacted common secrets and user-profile paths,
   reduced repetitive native diagnostics, and flushes queued logs on shutdown.
 - Removed search typing lag by debouncing input, batching result updates,

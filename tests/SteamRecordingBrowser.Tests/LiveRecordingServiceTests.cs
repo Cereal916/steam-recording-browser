@@ -60,6 +60,36 @@ public sealed class LiveRecordingServiceTests
     }
 
     [Fact]
+    public void GetDurationSeconds_PreservesSteamRetainedDurationWhenPeriodOffsetIsLarger()
+    {
+        const string finalizedRollingManifest = """
+            <MPD xmlns="urn:mpeg:dash:schema:mpd:2011" type="static"
+                 mediaPresentationDuration="PT1H55M34.602S">
+              <Period start="PT2H39M24S" />
+            </MPD>
+            """;
+        using var recording = new TemporaryRecording(finalizedRollingManifest);
+
+        var duration = new DashCompatibilityService().GetDurationSeconds(recording.ManifestPath);
+
+        Assert.Equal(6934.602, duration, 3);
+    }
+
+    [Fact]
+    public void GetDynamicDurationSeconds_UsesRetainedSegmentsAfterSessionRestart()
+    {
+        using var recording = new TemporaryRecording(Manifest);
+        File.WriteAllBytes(Path.Combine(recording.DirectoryPath, "init-stream0.m4s"), [0, 1, 2]);
+        foreach (var number in Enumerable.Range(1, 40))
+            File.WriteAllBytes(Path.Combine(recording.DirectoryPath,
+                $"chunk-stream0-{number:D5}.m4s"), [0, 1, 2]);
+
+        var duration = LiveRecordingService.GetDynamicDurationSeconds(recording.ManifestPath);
+
+        Assert.Equal(120, duration);
+    }
+
+    [Fact]
     public void CreateLiveManifest_AdvancesPastSegmentsRemovedFromRollingBuffer()
     {
         using var recording = new TemporaryRecording(Manifest);

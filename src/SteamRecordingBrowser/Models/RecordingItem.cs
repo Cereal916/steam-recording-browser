@@ -24,6 +24,7 @@ public sealed class RecordingItem : INotifyPropertyChanged
     public bool IsSavedClip => !IsAutoRecording;
     public IReadOnlyList<string> SessionPaths { get; init; } = Array.Empty<string>();
     public IReadOnlyList<double> SessionStartOffsetsSeconds { get; init; } = Array.Empty<double>();
+    public IReadOnlyList<DateTime> SessionStartTimes { get; init; } = Array.Empty<DateTime>();
 
     public bool IsLive
     {
