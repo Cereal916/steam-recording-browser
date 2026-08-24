@@ -11,6 +11,13 @@ public partial class App : Application
     {
         base.OnStartup(e);
 
+        // This must remain before theme registration, splash construction,
+        // native initialization, and service creation so it is always the
+        // first entry retained for the current application session.
+        AppLogger.Write($"Steam Recording Browser v{AppInfo.Version} starting new application session.");
+        AppLogger.Write($".NET runtime: {System.Runtime.InteropServices.RuntimeInformation.FrameworkDescription}");
+        AppLogger.Write("Runtime architecture: native C# WPF + bundled libVLC.");
+
         EventManager.RegisterClassHandler(
             typeof(Window),
             FrameworkElement.LoadedEvent,

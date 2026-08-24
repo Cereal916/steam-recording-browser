@@ -23,6 +23,9 @@ public partial class PlayerWindow : Window
     private readonly RecordingItem _item;
     private readonly MediaPlayer _player;
     private readonly Media _media;
+    private Media _activeMedia;
+    private Media? _liveMedia;
+    private readonly LiveDashServer? _liveDashServer;
     private int _lastAudibleVolume = 100;
     private int _desiredVolume = 100;
     private bool _desiredMuted;
@@ -31,9 +34,18 @@ public partial class PlayerWindow : Window
     private long _displayTimeMs;
     private long _displayClockTimestamp;
     private long _lastCorrectionTimestamp;
+    private long _lastLiveStateCheckTimestamp;
     private bool _displayClockInitialized;
     private bool _mediaEnded;
     private long? _pendingRestartSeekMs;
+    private bool _liveRecoveryPending;
+    private bool _followingLive;
+    private long _historyLengthMs;
+    private long _lastBufferingLogTimestamp;
+    private long _videoTransitionGeneration;
+    private bool _videoTransitionCovered = true;
+    private bool _videoTransitionHidePending;
+    private bool _videoTransitionAwaitingPlaying = true;
 
     // libVLC can continue reporting the pre-seek DASH timestamp briefly after
     // an explicit seek. During this window the UI trusts the requested target
@@ -46,6 +58,7 @@ public partial class PlayerWindow : Window
     private readonly Media _previewMedia;
 
     private bool _previewStarted;
+    private bool _previewHostRetryPending;
 
     private long _lastHoverPreviewTargetMs = -1;
     private long _lastHoverPreviewProgressLogTimestamp;
@@ -96,6 +109,7 @@ private readonly DispatcherTimer _hoverFramePauseTimer;
     private const long LongVideoThresholdMs = 60 * 60 * 1000;
     private const long LongVideoPreviewSegmentMs = 3_000;
     private const long FineScrubHalfWindowMs = 2 * 60 * 1000;
+    private const long LiveEdgeSafetyDelayMs = 6_000;
 
     private const int WhKeyboardLl = 13;
     private const int WhMouseLl = 14;
@@ -118,7 +132,9 @@ private readonly DispatcherTimer _hoverFramePauseTimer;
         _item = item;
 
         Title = $"Steam Recording Browser — {item.GameName}";
-        ClipInfoText.Text = $"{item.GameName}  •  {item.DisplayTime}";
+        ClipInfoText.Text = $"{item.GameName}  •  {item.DisplayTime}  •  {item.RecordingTypeLabel}";
+        LivePlaybackBadge.Visibility = item.IsLive ? Visibility.Visible : Visibility.Collapsed;
+        GoLiveButton.Visibility = item.IsLive ? Visibility.Visible : Visibility.Collapsed;
         UpdateFavoriteButton();
 
         _player = new MediaPlayer(vlc.LibVlc)
@@ -127,7 +143,15 @@ private readonly DispatcherTimer _hoverFramePauseTimer;
             Volume = 100
         };
         VideoView.MediaPlayer = _player;
-        _media = vlc.CreatePlaybackMedia(item.Path);
+        var sessionPaths = item.SessionPaths.Count > 0 ? item.SessionPaths : new[] { item.Path };
+        _liveDashServer = item.IsLive || sessionPaths.Count > 1
+            ? vlc.CreateLiveDashServer(sessionPaths)
+            : null;
+        var playbackUri = _liveDashServer?.ManifestUri;
+        _media = playbackUri is not null
+            ? vlc.CreatePlaybackMedia(playbackUri, isLive: true, useHardwareDecoding: !item.IsLive)
+            : vlc.CreatePlaybackMedia(item.Path);
+        _activeMedia = _media;
 
         // A second muted player is dedicated to timeline hover previews so
         // previewing another point never disturbs main playback.
@@ -136,7 +160,9 @@ private readonly DispatcherTimer _hoverFramePauseTimer;
             Mute = true
         };
         PreviewVideoView.MediaPlayer = _previewPlayer;
-        _previewMedia = vlc.CreatePlaybackMedia(item.Path);
+        _previewMedia = playbackUri is not null
+            ? vlc.CreatePlaybackMedia(playbackUri, isLive: true, useHardwareDecoding: !item.IsLive)
+            : vlc.CreatePlaybackMedia(item.Path);
         _previewMedia.AddOption(":no-audio");
 
         UpdateMetadataDisplay();
@@ -182,6 +208,11 @@ private readonly DispatcherTimer _hoverFramePauseTimer;
         _hoverFramePauseTimer.Tick += HoverFramePauseTimer_Tick;
 
         _player.EndReached += Player_EndReached;
+        _player.EncounteredError += Player_EncounteredError;
+        _player.Opening += Player_Opening;
+        _player.Buffering += Player_Buffering;
+        _player.Stopped += Player_Stopped;
+        _player.TimeChanged += Player_TimeChanged;
         _player.Playing += Player_Playing;
         _player.Paused += Player_Paused;
 
@@ -198,6 +229,7 @@ private readonly DispatcherTimer _hoverFramePauseTimer;
         Loaded += (_, _) =>
         {
             AttachNativeInputHook();
+            ConfigureNativeVideoHost(VideoView);
 
             if (!_player.Play(_media))
                 System.Windows.MessageBox.Show(this, "libVLC could not start this recording.", "Playback error",
@@ -226,6 +258,11 @@ private readonly DispatcherTimer _hoverFramePauseTimer;
             _hoverFramePauseTimer.Stop();
 
             _player.EndReached -= Player_EndReached;
+            _player.EncounteredError -= Player_EncounteredError;
+            _player.Opening -= Player_Opening;
+            _player.Buffering -= Player_Buffering;
+            _player.Stopped -= Player_Stopped;
+            _player.TimeChanged -= Player_TimeChanged;
             _player.Playing -= Player_Playing;
             _player.Paused -= Player_Paused;
 
@@ -239,8 +276,10 @@ private readonly DispatcherTimer _hoverFramePauseTimer;
 
             _previewMedia.Dispose();
             _previewPlayer.Dispose();
+            _liveMedia?.Dispose();
             _media.Dispose();
             _player.Dispose();
+            _liveDashServer?.Dispose();
         };
     }
 
@@ -249,6 +288,20 @@ private readonly DispatcherTimer _hoverFramePauseTimer;
         var length = Math.Max(0, _player.Length);
         var reportedTime = Math.Max(0, _player.Time);
         var now = System.Diagnostics.Stopwatch.GetTimestamp();
+        RefreshLivePlaybackState(now);
+
+        if (_followingLive)
+        {
+            _internalTimelineChange = true;
+            Timeline.Value = 1;
+            _internalTimelineChange = false;
+            TimeLabel.Text = _player.IsPlaying ? "LIVE" : "LIVE • Paused";
+            PlayPauseButton.Content = _player.IsPlaying ? "Pause" : "Play";
+            return;
+        }
+
+        if (length > 0)
+            _historyLengthMs = length;
 
         UpdateTimelineTicks(length);
 
@@ -352,10 +405,56 @@ private readonly DispatcherTimer _hoverFramePauseTimer;
         PlayPauseButton.Content = _mediaEnded ? "Replay" : (_player.IsPlaying ? "Pause" : "Play");
     }
 
+    private void RefreshLivePlaybackState(long now)
+    {
+        if (_liveDashServer is null)
+            return;
+
+        var elapsed = (now - _lastLiveStateCheckTimestamp) * 1000d /
+                      System.Diagnostics.Stopwatch.Frequency;
+        if (_lastLiveStateCheckTimestamp != 0 && elapsed < 2_000)
+            return;
+
+        _lastLiveStateCheckTimestamp = now;
+        _item.IsLive = _item.SessionPaths.Any(LiveRecordingService.IsActivelyRecording);
+        LivePlaybackBadge.Visibility = _item.IsLive ? Visibility.Visible : Visibility.Collapsed;
+        GoLiveButton.Visibility = _item.IsLive ? Visibility.Visible : Visibility.Collapsed;
+        ClipInfoText.Text = $"{_item.GameName}  •  {_item.DisplayTime}  •  {_item.RecordingTypeLabel}";
+    }
+
+    private void GoLive_Click(object sender, RoutedEventArgs e)
+    {
+        if (_liveDashServer is null || !_item.IsLive)
+            return;
+
+        _liveMedia ??= _vlc.CreatePlaybackMedia(
+            _liveDashServer.LiveManifestUri, isLive: true, useHardwareDecoding: true);
+        _followingLive = true;
+        _activeMedia = _liveMedia;
+        _pendingRestartSeekMs = null;
+        _mediaEnded = false;
+        ShowVideoTransitionCover("switching to dynamic live playback");
+        AppLogger.Write(
+            $"Go Live switching to dynamic session. uri={_liveDashServer.LiveManifestUri} " +
+            $"sessions={string.Join(" | ", _item.SessionPaths)} state={_player.State}");
+        _player.Stop();
+        if (!_player.Play(_activeMedia))
+            AppLogger.Write("libVLC could not start the dynamic live session.", "ERROR");
+    }
+
     private void Player_EndReached(object? sender, EventArgs e)
     {
         Dispatcher.BeginInvoke(new Action(() =>
         {
+            if (_followingLive && _item.IsLive && _liveDashServer is not null)
+            {
+                _mediaEnded = false;
+                PlayPauseButton.Content = "Following live";
+                if (!_liveRecoveryPending)
+                    _ = RecoverLiveEdgeAsync();
+                return;
+            }
+
             _mediaEnded = true;
             _seekSettling = false;
             _displayClockInitialized = false;
@@ -371,11 +470,143 @@ private readonly DispatcherTimer _hoverFramePauseTimer;
         }));
     }
 
+    private void Player_EncounteredError(object? sender, EventArgs e)
+    {
+        Dispatcher.BeginInvoke(new Action(() =>
+        {
+            ShowVideoTransitionCover("player error");
+            AppLogger.Write(
+                    $"Main player encountered an error. path={_item.Path} live={_item.IsLive} " +
+                    $"sessions={_item.SessionPaths.Count} time={_player.Time}ms length={_player.Length}ms " +
+                    $"position={_player.Position:F4} state={_player.State}",
+                    "ERROR");
+        }));
+    }
+
+    private void Player_TimeChanged(object? sender, MediaPlayerTimeChangedEventArgs e)
+    {
+        if (!_videoTransitionCovered || _videoTransitionAwaitingPlaying ||
+            _videoTransitionHidePending || e.Time <= 0)
+            return;
+
+        _videoTransitionHidePending = true;
+        var generation = Interlocked.Read(ref _videoTransitionGeneration);
+        Dispatcher.BeginInvoke(
+            DispatcherPriority.Render,
+            new Action(async () =>
+            {
+                // TimeChanged can precede presentation by a render interval.
+                // Keep the native HWND covered until the decoded frame has
+                // had time to reach the Direct3D swap chain.
+                await Task.Delay(120);
+                if (!_videoTransitionCovered ||
+                    generation != Interlocked.Read(ref _videoTransitionGeneration) ||
+                    !_player.IsPlaying)
+                {
+                    _videoTransitionHidePending = false;
+                    return;
+                }
+
+                VideoTransitionCover.Visibility = Visibility.Collapsed;
+                _videoTransitionCovered = false;
+                _videoTransitionHidePending = false;
+                AppLogger.Write($"Video transition cover removed at {_player.Time}ms.", "DEBUG");
+            }));
+    }
+
+    private void ShowVideoTransitionCover(string reason)
+    {
+        Interlocked.Increment(ref _videoTransitionGeneration);
+        _videoTransitionCovered = true;
+        _videoTransitionHidePending = false;
+        _videoTransitionAwaitingPlaying = true;
+        VideoTransitionCover.Visibility = Visibility.Visible;
+        AppLogger.Write($"Video transition cover shown: {reason}.", "DEBUG");
+    }
+
+    private void Player_Opening(object? sender, EventArgs e) =>
+        AppLogger.Write(
+            $"Main player opening media. mode={(_followingLive ? "dynamic-live" : "history")} " +
+            $"time={_player.Time}ms length={_player.Length}ms state={_player.State}", "DEBUG");
+
+    private void Player_Buffering(object? sender, MediaPlayerBufferingEventArgs e)
+    {
+        var now = System.Diagnostics.Stopwatch.GetTimestamp();
+        var elapsedMs = (now - _lastBufferingLogTimestamp) * 1000d /
+                        System.Diagnostics.Stopwatch.Frequency;
+        if (_lastBufferingLogTimestamp != 0 && elapsedMs < 1_000 && e.Cache is > 0 and < 100)
+            return;
+
+        _lastBufferingLogTimestamp = now;
+        AppLogger.Write(
+            $"Main player buffering. mode={(_followingLive ? "dynamic-live" : "history")} " +
+            $"cache={e.Cache:F1}% time={_player.Time}ms length={_player.Length}ms state={_player.State}", "DEBUG");
+    }
+
+    private void Player_Stopped(object? sender, EventArgs e) =>
+        AppLogger.Write(
+            $"Main player stopped. mode={(_followingLive ? "dynamic-live" : "history")} " +
+            $"time={_player.Time}ms length={_player.Length}ms state={_player.State}", "DEBUG");
+
+    private void SeekToLiveEdge()
+    {
+        var length = Math.Max(0, _player.Length);
+        var target = Math.Max(0, length - LiveEdgeSafetyDelayMs);
+        if (_player.State == VLCState.Ended)
+        {
+            if (IsDynamicLivePlayback)
+            {
+                RestartDynamicLivePlayback("recovering ended live stream");
+                return;
+            }
+            RestartMediaAt(target);
+            return;
+        }
+
+        _mediaEnded = false;
+        _seekSettling = true;
+        _seekTargetMs = target;
+        _seekSettleDeadlineTimestamp = System.Diagnostics.Stopwatch.GetTimestamp() +
+                                       System.Diagnostics.Stopwatch.Frequency * 2;
+        if (length > 0)
+            _player.Time = target;
+        if (!_player.IsPlaying)
+            _player.Play();
+        ResetDisplayClock(target, System.Diagnostics.Stopwatch.GetTimestamp());
+    }
+
+    private async Task RecoverLiveEdgeAsync()
+    {
+        _liveRecoveryPending = true;
+        try
+        {
+            await Task.Delay(1_000);
+            if (IsLoaded && _item.IsLive)
+            {
+                if (IsDynamicLivePlayback)
+                    RestartDynamicLivePlayback("refreshing live stream after endpoint");
+                else
+                {
+                    var target = Math.Max(0, Math.Max(0, _player.Length) - LiveEdgeSafetyDelayMs);
+                    RestartMediaAt(target);
+                }
+            }
+        }
+        finally
+        {
+            _liveRecoveryPending = false;
+        }
+    }
+
     private void Player_Playing(object? sender, EventArgs e)
     {
         Dispatcher.BeginInvoke(new Action(() =>
         {
             _mediaEnded = false;
+            _videoTransitionAwaitingPlaying = false;
+            AppLogger.Write(
+                $"Main player entered Playing. live={_item.IsLive} time={_player.Time}ms " +
+                $"length={_player.Length}ms position={_player.Position:F4} state={_player.State}", "DEBUG");
 
             if (!_scrubbing)
                 EnsureMainAudioEnabled();
@@ -926,6 +1157,37 @@ private readonly DispatcherTimer _hoverFramePauseTimer;
     [DllImport("kernel32.dll", CharSet = CharSet.Auto)]
     private static extern IntPtr GetModuleHandle(string? lpModuleName);
 
+    [DllImport("user32.dll", EntryPoint = "SetClassLongPtrW", SetLastError = true)]
+    private static extern IntPtr SetClassLongPtr(IntPtr hWnd, int nIndex, IntPtr dwNewLong);
+
+    [DllImport("gdi32.dll")]
+    private static extern IntPtr GetStockObject(int fnObject);
+
+    [DllImport("user32.dll")]
+    [return: MarshalAs(UnmanagedType.Bool)]
+    private static extern bool InvalidateRect(IntPtr hWnd, IntPtr lpRect, bool bErase);
+
+    private static bool ConfigureNativeVideoHost(Control view, MediaPlayer? player = null)
+    {
+        const int gclpBackgroundBrush = -10;
+        const int blackBrush = 4;
+
+        view.ApplyTemplate();
+        if (view.Template?.FindName("PART_PlayerHost", view) is not HwndHost host ||
+            host.Handle == IntPtr.Zero)
+        {
+            AppLogger.Write("Could not resolve the native libVLC video host for black background setup.", "DEBUG");
+            return false;
+        }
+
+        if (player is not null)
+            player.Hwnd = host.Handle;
+        SetClassLongPtr(host.Handle, gclpBackgroundBrush, GetStockObject(blackBrush));
+        InvalidateRect(host.Handle, IntPtr.Zero, true);
+        AppLogger.Write($"Native libVLC video host background set to black. hwnd=0x{host.Handle.ToInt64():X}", "DEBUG");
+        return true;
+    }
+
     private void TogglePlayback(string source)
     {
         try
@@ -1030,8 +1292,15 @@ private readonly DispatcherTimer _hoverFramePauseTimer;
             return;
         }
 
-        targetMs = Math.Clamp(targetMs, 0, _player.Length);
+        var seekLength = IsDynamicLivePlayback ? _historyLengthMs : _player.Length;
+        targetMs = Math.Clamp(targetMs, 0, Math.Max(0, seekLength));
         ExactTimePopup.IsOpen = false;
+        if (IsDynamicLivePlayback)
+        {
+            SwitchToHistory(targetMs);
+            TimeButton.Focus();
+            return;
+        }
         SeekToNormalizedPosition(targetMs / (double)_player.Length);
         TimeButton.Focus();
     }
@@ -1040,6 +1309,15 @@ private readonly DispatcherTimer _hoverFramePauseTimer;
     {
         if (e.ChangedButton != MouseButton.Left)
             return;
+
+        if (IsDynamicLivePlayback)
+        {
+            var historyPosition = GetNormalizedMousePosition(e);
+            var target = (long)Math.Round(Math.Max(0, _historyLengthMs) * historyPosition);
+            SwitchToHistory(target);
+            e.Handled = true;
+            return;
+        }
 
         _dragging = true;
         _scrubbing = true;
@@ -1603,6 +1881,26 @@ private readonly DispatcherTimer _hoverFramePauseTimer;
             if (_previewStarted)
                 return;
 
+            if (!ConfigureNativeVideoHost(PreviewVideoView, _previewPlayer))
+            {
+                if (!_previewHostRetryPending && TimelinePreviewPopup.IsOpen)
+                {
+                    _previewHostRetryPending = true;
+                    Dispatcher.BeginInvoke(
+                        DispatcherPriority.Render,
+                        new Action(() =>
+                        {
+                            _previewHostRetryPending = false;
+                            if (!TimelinePreviewPopup.IsOpen)
+                                return;
+                            EnsurePreviewStarted(_lastHoverPreviewTargetMs >= 0
+                                ? _lastHoverPreviewTargetMs
+                                : targetMs);
+                        }));
+                }
+                return;
+            }
+
             _lastHoverPreviewTargetMs = targetMs;
             _previewStarted = _previewPlayer.Play(_previewMedia);
 
@@ -1840,6 +2138,12 @@ private readonly DispatcherTimer _hoverFramePauseTimer;
     {
         normalized = Math.Clamp(normalized, 0d, 1d);
 
+        if (IsDynamicLivePlayback)
+        {
+            SwitchToHistory((long)Math.Round(Math.Max(0, _historyLengthMs) * normalized));
+            return;
+        }
+
         if (_player.Length > 0)
         {
             var targetMs = (long)Math.Round(_player.Length * normalized);
@@ -1872,6 +2176,15 @@ private readonly DispatcherTimer _hoverFramePauseTimer;
 
     private void SeekRelative(long deltaMs)
     {
+        if (IsDynamicLivePlayback)
+        {
+            if (deltaMs >= 0)
+                return;
+            var historyTarget = Math.Clamp(_historyLengthMs + deltaMs, 0, Math.Max(0, _historyLengthMs));
+            SwitchToHistory(historyTarget);
+            return;
+        }
+
         if (_player.Length <= 0)
             return;
 
@@ -1900,6 +2213,7 @@ private readonly DispatcherTimer _hoverFramePauseTimer;
 
         _pendingRestartSeekMs = targetMs;
         _mediaEnded = false;
+        ShowVideoTransitionCover("restarting media");
         BeginSeekSettlement(targetMs);
 
         // EndReached leaves libVLC in a terminal playback state. Starting the
@@ -1907,7 +2221,7 @@ private readonly DispatcherTimer _hoverFramePauseTimer;
         // the requested seek once that session is ready.
         _player.Stop();
 
-        if (!_player.Play(_media))
+        if (!_player.Play(_activeMedia))
         {
             _pendingRestartSeekMs = null;
             System.Windows.MessageBox.Show(
@@ -1918,6 +2232,39 @@ private readonly DispatcherTimer _hoverFramePauseTimer;
                 MessageBoxImage.Error);
         }
     }
+
+    private void SwitchToHistory(long targetMs)
+    {
+        _followingLive = false;
+        _activeMedia = _media;
+        _pendingRestartSeekMs = Math.Clamp(targetMs, 0, Math.Max(0, _historyLengthMs));
+        _mediaEnded = false;
+        ShowVideoTransitionCover("returning to historical playback");
+        BeginSeekSettlement(_pendingRestartSeekMs.Value);
+        AppLogger.Write($"Leaving live mode for combined history at {_pendingRestartSeekMs.Value}ms.");
+        _player.Stop();
+        if (!_player.Play(_activeMedia))
+        {
+            _pendingRestartSeekMs = null;
+            AppLogger.Write("libVLC could not resume combined historical playback.", "ERROR");
+        }
+    }
+
+    private void RestartDynamicLivePlayback(string reason)
+    {
+        if (!IsDynamicLivePlayback)
+            return;
+
+        _pendingRestartSeekMs = null;
+        _mediaEnded = false;
+        ShowVideoTransitionCover(reason);
+        AppLogger.Write($"Restarting dynamic live playback without a seek: {reason}.", "DEBUG");
+        _player.Stop();
+        if (!_player.Play(_activeMedia))
+            AppLogger.Write("libVLC could not restart dynamic live playback.", "ERROR");
+    }
+
+    private bool IsDynamicLivePlayback => _liveMedia is not null && ReferenceEquals(_activeMedia, _liveMedia);
 
     private void BeginSeekSettlement(long targetMs)
     {
@@ -2088,7 +2435,7 @@ private readonly DispatcherTimer _hoverFramePauseTimer;
         };
 
         var completed = progressWindow.ShowDialog() == true;
-        ClipInfoText.Text = $"{_item.GameName}  •  {_item.DisplayTime}";
+        ClipInfoText.Text = $"{_item.GameName}  •  {_item.DisplayTime}  •  {_item.RecordingTypeLabel}";
 
         if (wasPlaying)
             _player.Play();
@@ -2168,6 +2515,36 @@ private readonly DispatcherTimer _hoverFramePauseTimer;
             Canvas.SetLeft(label, Math.Clamp(x - label.DesiredSize.Width / 2d, 0, Math.Max(0, width - label.DesiredSize.Width)));
             Canvas.SetTop(label, 4);
             TimelineTickCanvas.Children.Add(label);
+        }
+
+        if (_item.SessionStartOffsetsSeconds.Count > 1 && _item.DurationSeconds > 0)
+        {
+            var sessionBrush = new SolidColorBrush(MediaColor.FromRgb(102, 192, 244));
+            foreach (var offsetSeconds in _item.SessionStartOffsetsSeconds.Skip(1))
+            {
+                var x = Math.Clamp(offsetSeconds / _item.DurationSeconds * width, 0, width);
+                TimelineTickCanvas.Children.Add(new Line
+                {
+                    X1 = x,
+                    X2 = x,
+                    Y1 = 0,
+                    Y2 = 18,
+                    Stroke = sessionBrush,
+                    StrokeThickness = 2.5,
+                    ToolTip = "New gameplay session"
+                });
+                var marker = new Polygon
+                {
+                    Fill = sessionBrush,
+                    Points = new System.Windows.Media.PointCollection
+                    {
+                        new(-4, 0), new(4, 0), new(0, 5)
+                    }
+                };
+                Canvas.SetLeft(marker, x);
+                Canvas.SetTop(marker, 0);
+                TimelineTickCanvas.Children.Add(marker);
+            }
         }
     }
 

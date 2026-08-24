@@ -19,6 +19,7 @@ Steam Recording Browser.
 - [0004 - Repository and semantic-version baseline](0004-v1-repository-baseline.md)
 - [0005 - UI consistency and AI-assisted contribution standards](0005-ui-and-ai-contribution-standards.md)
 - [0006 - Bundled FFmpeg export transcoding](0006-ffmpeg-export-transcoding.md)
+- [0007 - Proxy active rolling recordings through loopback DASH](0007-active-rolling-recording-playback.md)
 
 Historical implementation iterations are tracked in `CHANGELOG.md`, not in
 current ADR text.

@@ -207,10 +207,10 @@
                         <Grid>
                             <TextBox x:Name="SearchBox"
                                      Height="34"
-                                     ToolTip="Search game names, descriptions, and tags"
+                                     ToolTip="Search game names, descriptions, tags, and recording types"
                                      TextChanged="SearchBox_TextChanged"/>
                             <TextBlock x:Name="SearchHint"
-                                       Text="Game, description, or tag…"
+                                       Text="Game, description, tag, or type…"
                                        Foreground="#667080"
                                        VerticalAlignment="Center"
                                        Margin="11,0,0,0"
@@ -297,6 +297,24 @@
                                             </Style>
                                         </TextBlock.Style>
                                     </TextBlock>
+                                    <Border HorizontalAlignment="Left" VerticalAlignment="Top"
+                                            Margin="7" Padding="7,4" CornerRadius="4"
+                                            BorderThickness="1">
+                                        <Border.Style>
+                                            <Style TargetType="Border">
+                                                <Setter Property="Background" Value="#E0242B38"/>
+                                                <Setter Property="BorderBrush" Value="#536176"/>
+                                                <Style.Triggers>
+                                                    <DataTrigger Binding="{Binding IsLive}" Value="True">
+                                                        <Setter Property="Background" Value="#E0A21E2B"/>
+                                                        <Setter Property="BorderBrush" Value="#FF6673"/>
+                                                    </DataTrigger>
+                                                </Style.Triggers>
+                                            </Style>
+                                        </Border.Style>
+                                        <TextBlock Text="{Binding RecordingTypeLabel}" Foreground="#FFFFFF"
+                                                   FontSize="10" FontWeight="Bold"/>
+                                    </Border>
                                 </Grid>
                             </Border>
 
@@ -420,6 +438,25 @@
                                             </Style>
                                         </TextBlock.Style>
                                     </TextBlock>
+                                    <Border HorizontalAlignment="Left"
+                                            VerticalAlignment="Top"
+                                            Margin="6" Padding="6,3"
+                                            BorderThickness="1" CornerRadius="4">
+                                        <Border.Style>
+                                            <Style TargetType="Border">
+                                                <Setter Property="Background" Value="#E0242B38"/>
+                                                <Setter Property="BorderBrush" Value="#536176"/>
+                                                <Style.Triggers>
+                                                    <DataTrigger Binding="{Binding IsLive}" Value="True">
+                                                        <Setter Property="Background" Value="#E0A21E2B"/>
+                                                        <Setter Property="BorderBrush" Value="#FF6673"/>
+                                                    </DataTrigger>
+                                                </Style.Triggers>
+                                            </Style>
+                                        </Border.Style>
+                                        <TextBlock Text="{Binding RecordingTypeLabel}"
+                                                   Foreground="#FFFFFF" FontSize="9" FontWeight="Bold"/>
+                                    </Border>
                                     <Border HorizontalAlignment="Right"
                                             VerticalAlignment="Bottom"
                                             Margin="6"
@@ -507,6 +544,7 @@
                             <Image x:Name="ClipPreviewThumbnail"
                                    Stretch="Uniform"/>
                             <vlc:VideoView x:Name="ClipPreviewVideoView"
+                                           Background="#000000"
                                            Visibility="Hidden"
                                            IsHitTestVisible="False"/>
                             <TextBlock x:Name="ClipPreviewUnavailableText"

@@ -8,6 +8,7 @@ public sealed class RecordingItem : INotifyPropertyChanged
     private bool _isFavorite;
     private string _description = "";
     private IReadOnlyList<string> _tags = Array.Empty<string>();
+    private bool _isLive;
 
     public required string Path { get; init; }
     public required string Folder { get; init; }
@@ -19,6 +20,25 @@ public sealed class RecordingItem : INotifyPropertyChanged
     public string? ThumbnailPath { get; init; }
     public string? CoverArtPath { get; init; }
     public string? DisplayImagePath => ThumbnailPath ?? CoverArtPath;
+    public bool IsAutoRecording { get; init; }
+    public bool IsSavedClip => !IsAutoRecording;
+    public IReadOnlyList<string> SessionPaths { get; init; } = Array.Empty<string>();
+    public IReadOnlyList<double> SessionStartOffsetsSeconds { get; init; } = Array.Empty<double>();
+
+    public bool IsLive
+    {
+        get => _isLive;
+        set
+        {
+            if (_isLive == value) return;
+            _isLive = value;
+            OnPropertyChanged();
+            OnPropertyChanged(nameof(RecordingTypeLabel));
+        }
+    }
+
+    public string RecordingTypeLabel => IsLive ? "LIVE • AUTO RECORDING" :
+        IsAutoRecording ? "AUTO RECORDING" : "SAVED CLIP";
 
     public string DisplayTime => Timestamp.ToString("MMM d, yyyy  h:mm:ss tt");
     public string DurationText => DurationSeconds > 0 ? FormatDuration(DurationSeconds) : "—";

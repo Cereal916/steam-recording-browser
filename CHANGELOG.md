@@ -4,6 +4,82 @@ All notable changes to Steam Recording Browser are documented here.
 
 The project adopts semantic versioning beginning with **1.0.0**.
 
+## Unreleased
+
+### Added
+
+- Added automatic classification badges for Steam background recordings,
+  actively recording sessions, and saved clips in list and tile layouts.
+- Added near-live playback for active rolling recordings through a local
+  dynamic DASH bridge, stable-segment protection, automatic finalized-recording
+  transition, a player live indicator, and a **Go live** control.
+- Added recording-type labels to library search, including `auto recording`,
+  `saved clip`, and `live`.
+- Combined background-recording sessions into one automatic recording per game,
+  with session-boundary markers on the player timeline.
+
+### Fixed
+
+- Delayed enlarged clip previews until a card has been continuously hovered for
+  half a second, avoiding popup and decoder churn while scrolling tile view.
+- Restored hardware decoding for high-bitrate live HEVC playback, increased
+  protection from Steam's rolling segment deletion, and rate-limited repetitive
+  native frame-timing diagnostics.
+- Fixed older static background sessions being mislabeled live when Steam
+  updated only their manifests, and preserved Steam's live availability
+  timeline so the actual active session can open through the DASH bridge.
+- Fixed **Go live** seeking into an unfinished segment by following the live
+  edge from a safe playback delay and recovering as the recording grows.
+- Fixed combined rolling recordings using each session's historical duration
+  instead of its retained playable range, which caused black frames and stalls.
+- Fixed the active DASH period being emitted with a fixed endpoint, preventing
+  libVLC from discovering and following its growing media timeline.
+- Changed libVLC playback of growing multi-session recordings to finite DASH
+  snapshots that expose a seekable duration and refresh at the live edge.
+- Added live-player, manifest-request, and missing/incomplete segment logging
+  to make playback failures diagnosable from the application log.
+- Fixed Steam's live MPD continuing to advertise segments already removed from
+  its rolling buffer by advancing playback to the first file still on disk.
+- Changed **Go Live** to switch from the combined historical snapshot to the
+  corrected dynamic Steam session, eliminating three-second refresh flashes.
+- Added filtered libVLC adaptive-stream diagnostics, player state transitions,
+  and sampled successful DASH requests for live playback troubleshooting.
+- Fixed the live availability anchor remaining tied to deleted segments after
+  advancing the rolling-buffer start number, which produced an empty playlist.
+- Set all libVLC host surfaces to black so startup, letterboxing, and media
+  transitions cannot expose the control's default white background.
+- Set the native WPF video child-window erase brush to black, since the HWND
+  surface is not affected by the managed `VideoView.Background` property.
+- Added a dark-themed Debug filter to the live log viewer and demoted routine
+  adaptive-stream and benign Windows video-output diagnostics from warnings.
+- Limited the live log viewer to entries written during the current application
+  session instead of loading older entries from the persistent log file.
+- Made the application startup marker and centralized version number the first
+  current-session log entry, before native or application services initialize.
+- Switched the main live-recording player to software decoding after D3D11VA
+  reported HDR conversion and decoder-texture failures; other playback remains
+  hardware accelerated.
+- Stopped and detached clip-card hover playback before opening the player so a
+  disappearing popup host cannot produce a separate `VLC Direct3D11` window.
+- Demoted minor late-frame diagnostics to Debug to keep normal logs readable.
+- Delayed timeline-hover decoding until its popup creates a native video host,
+  then explicitly attached libVLC to that HWND to prevent a standalone window.
+- Added a black native-foreground safety cover during initial playback, live
+  switching, restarts, and errors; it clears only after decoded time advances
+  and a frame has had time to render, preventing potentially harmful flashes.
+- Prevented stale timestamps from the previous media source from removing the
+  transition cover before the replacement source reaches `Playing`.
+- Added extended log selection, Ctrl+C, a dark context action, and a **Copy
+  selected** button to the live log viewer.
+- Forced SDR tone mapping for the WPF video surface and disabled hardware
+  decoding for live timeline previews to avoid HDR/D3D11 allocation failures.
+- Routed all seeks away from the non-seekable dynamic source and back to the
+  finite historical snapshot before applying the requested position.
+- Added a rolling-buffer start margin so Steam cannot prune the first advertised
+  segment between manifest generation and libVLC's request.
+- Fixed that pruning margin being calculated independently for video and audio,
+  which could separate the tracks by several minutes and break live switching.
+
 ## 1.3.0 - 2026-08-23
 
 ### Added

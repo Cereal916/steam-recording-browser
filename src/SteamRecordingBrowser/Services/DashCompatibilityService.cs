@@ -9,6 +9,7 @@ namespace SteamRecordingBrowser.Services;
 
 public sealed class DashCompatibilityService
 {
+    private const double GrowingSnapshotTailMarginSeconds = 3;
     public VideoCodecInfo GetVideoCodec(string mpdPath)
     {
         try
@@ -59,8 +60,18 @@ public sealed class DashCompatibilityService
         {
             var doc = XDocument.Load(mpdPath);
             var mpd = doc.Root;
+            if (string.Equals(mpd?.Attribute("type")?.Value, "dynamic", StringComparison.OrdinalIgnoreCase))
+            {
+                var liveDuration = LiveRecordingService.GetDynamicDurationSeconds(mpdPath);
+                if (liveDuration > 0)
+                    return liveDuration;
+            }
             var duration = mpd?.Attribute("mediaPresentationDuration")?.Value;
-            return ParseIsoDuration(duration);
+            var totalSeconds = ParseIsoDuration(duration);
+            var ns = mpd?.Name.Namespace ?? XNamespace.None;
+            var periodStart = ParseIsoDuration(mpd?.Elements(ns + "Period").FirstOrDefault()
+                ?.Attribute("start")?.Value);
+            return Math.Max(0, totalSeconds - periodStart);
         }
         catch (Exception ex)
         {
@@ -134,6 +145,322 @@ public sealed class DashCompatibilityService
         }
     }
 
+    public string CreateLiveManifest(string sourceMpd)
+    {
+        var doc = XDocument.Load(sourceMpd, LoadOptions.PreserveWhitespace);
+        var root = doc.Root ?? throw new InvalidDataException("MPD has no root element.");
+        var ns = root.Name.Namespace;
+        var period = root.Elements(ns + "Period").FirstOrDefault()
+                     ?? throw new InvalidDataException("MPD has no Period element.");
+        var sourceDurationSeconds = ParseIsoDuration(root.Attribute("mediaPresentationDuration")?.Value);
+        var periodStart = ParseIsoDuration(period.Attribute("start")?.Value);
+        var durationSeconds = Math.Max(0, sourceDurationSeconds - periodStart);
+        var durationText = durationSeconds > 0
+            ? System.Xml.XmlConvert.ToString(TimeSpan.FromSeconds(durationSeconds))
+            : null;
+        var isActive = LiveRecordingService.IsActivelyRecording(sourceMpd);
+        var sourceAvailabilityStart = root.Attribute("availabilityStartTime")?.Value;
+        var retainedStartShiftSeconds = 0d;
+
+        period.SetAttributeValue("start", "PT0S");
+        if (isActive)
+        {
+            period.Attribute("duration")?.Remove();
+            root.SetAttributeValue("type", "dynamic");
+            root.SetAttributeValue("minimumUpdatePeriod", "PT1S");
+            root.SetAttributeValue("suggestedPresentationDelay", "PT3S");
+            root.SetAttributeValue("timeShiftBufferDepth", "PT2H");
+            root.SetAttributeValue("publishTime", DateTime.UtcNow.ToString("O", CultureInfo.InvariantCulture));
+            if (string.IsNullOrWhiteSpace(sourceAvailabilityStart))
+            {
+                root.SetAttributeValue("availabilityStartTime",
+                    DateTime.UtcNow.Subtract(TimeSpan.FromSeconds(Math.Max(1, durationSeconds)))
+                        .ToString("O", CultureInfo.InvariantCulture));
+            }
+            root.Attribute("mediaPresentationDuration")?.Remove();
+        }
+        else
+        {
+            root.SetAttributeValue("type", "static");
+            if (!string.IsNullOrWhiteSpace(durationText))
+                period.SetAttributeValue("duration", durationText);
+            root.Attribute("minimumUpdatePeriod")?.Remove();
+            root.Attribute("suggestedPresentationDelay")?.Remove();
+            root.Attribute("publishTime")?.Remove();
+            root.Attribute("availabilityStartTime")?.Remove();
+        }
+
+        var representations = period.Descendants(ns + "Representation").ToArray();
+        long? alignedActiveStartNumber = null;
+        if (isActive)
+        {
+            var availableStarts = new List<long>();
+            foreach (var representation in representations)
+            {
+                var template = representation.Element(ns + "SegmentTemplate")
+                    ?? representation.Parent?.Element(ns + "SegmentTemplate");
+                if (template is null) continue;
+
+                var declaredStart = ReadLong(template.Attribute("startNumber")?.Value, 1);
+                var mediaTemplate = template.Attribute("media")?.Value;
+                var repId = representation.Attribute("id")?.Value ?? "";
+                var directory = System.IO.Path.GetDirectoryName(sourceMpd)!;
+                var availableStart = ResolveFirstSegmentPath(
+                    directory, mediaTemplate, repId, declaredStart) is not null
+                    ? declaredStart
+                    : FindFirstAvailableSegmentNumber(directory, mediaTemplate, repId, declaredStart);
+                if (availableStart.HasValue)
+                    availableStarts.Add(availableStart.Value);
+            }
+
+            if (availableStarts.Count > 0)
+            {
+                var commonStart = availableStarts.Max();
+                // Leave enough distance from Steam's rolling deletion edge for
+                // libVLC to initialize both tracks before fragments disappear.
+                const long rollingPruneSafetySegments = 20;
+                var safeStart = commonStart + rollingPruneSafetySegments;
+                var directory = System.IO.Path.GetDirectoryName(sourceMpd)!;
+                var allHaveSafeStart = representations.All(representation =>
+                {
+                    var template = representation.Element(ns + "SegmentTemplate")
+                        ?? representation.Parent?.Element(ns + "SegmentTemplate");
+                    if (template is null) return true;
+                    return ResolveFirstSegmentPath(directory, template.Attribute("media")?.Value,
+                        representation.Attribute("id")?.Value ?? "", safeStart) is not null;
+                });
+                alignedActiveStartNumber = allHaveSafeStart ? safeStart : commonStart;
+            }
+        }
+
+        foreach (var representation in representations)
+        {
+            var template = representation.Element(ns + "SegmentTemplate")
+                ?? representation.Parent?.Element(ns + "SegmentTemplate");
+            if (template is null) continue;
+
+            var timescale = ReadLong(template.Attribute("timescale")?.Value, 1);
+            var startNumber = ReadLong(template.Attribute("startNumber")?.Value, 1);
+            var declaredStartNumber = startNumber;
+            var mediaTemplate = template.Attribute("media")?.Value;
+            var repId = representation.Attribute("id")?.Value ?? "";
+            var directory = System.IO.Path.GetDirectoryName(sourceMpd)!;
+            if (alignedActiveStartNumber.HasValue && startNumber < alignedActiveStartNumber.Value)
+            {
+                startNumber = alignedActiveStartNumber.Value;
+                template.SetAttributeValue("startNumber", startNumber.ToString(CultureInfo.InvariantCulture));
+                var segmentDuration = ReadLong(template.Attribute("duration")?.Value, 0);
+                if (segmentDuration > 0 && timescale > 0)
+                {
+                    retainedStartShiftSeconds = Math.Max(retainedStartShiftSeconds,
+                        (startNumber - declaredStartNumber) * segmentDuration / (double)timescale);
+                }
+                AppLogger.Write(
+                    $"Aligned live DASH representation {repId} to common startNumber={startNumber}. " +
+                    $"declared={declaredStartNumber} source={sourceMpd}",
+                    "DEBUG");
+            }
+            var declaredFirstSegment = ResolveFirstSegmentPath(
+                directory, mediaTemplate, repId, startNumber);
+            if (declaredFirstSegment is null)
+            {
+                var availableStart = FindFirstAvailableSegmentNumber(
+                    directory, mediaTemplate, repId, startNumber);
+                if (availableStart.HasValue)
+                {
+                    var safeStart = availableStart.Value;
+                    if (isActive && !alignedActiveStartNumber.HasValue)
+                    {
+                        // Steam deletes the oldest fragments while the bridge
+                        // is serving its manifest. Stay several segments ahead
+                        // of the pruning edge so the advertised first file is
+                        // still present when libVLC asks for it.
+                        const long rollingPruneSafetySegments = 20;
+                        var candidate = availableStart.Value + rollingPruneSafetySegments;
+                        if (ResolveFirstSegmentPath(directory, mediaTemplate, repId, candidate) is not null)
+                            safeStart = candidate;
+                    }
+                    AppLogger.Write(
+                        $"Adjusted stale DASH startNumber for representation {repId}: " +
+                        $"declared={startNumber} available={availableStart.Value} safe={safeStart} source={sourceMpd}",
+                        "DEBUG");
+                    startNumber = safeStart;
+                    template.SetAttributeValue("startNumber",
+                        startNumber.ToString(CultureInfo.InvariantCulture));
+                    var segmentDuration = ReadLong(template.Attribute("duration")?.Value, 0);
+                    if (segmentDuration > 0 && timescale > 0)
+                    {
+                        retainedStartShiftSeconds = Math.Max(retainedStartShiftSeconds,
+                            (startNumber - declaredStartNumber) * segmentDuration / (double)timescale);
+                    }
+                }
+            }
+            var firstSegment = ResolveFirstSegmentPath(
+                directory, mediaTemplate, repId, startNumber);
+            var tfdt = firstSegment is not null ? TryReadTfdt(firstSegment) : null;
+            var presentationOffset = tfdt ?? (long)Math.Round(periodStart * timescale);
+            template.SetAttributeValue("presentationTimeOffset",
+                presentationOffset.ToString(CultureInfo.InvariantCulture));
+        }
+
+        if (isActive && retainedStartShiftSeconds > 0 &&
+            DateTime.TryParse(sourceAvailabilityStart, CultureInfo.InvariantCulture,
+                DateTimeStyles.AssumeUniversal, out var availabilityStart))
+        {
+            var adjustedAvailability = availabilityStart.ToUniversalTime()
+                .AddSeconds(retainedStartShiftSeconds);
+            root.SetAttributeValue("availabilityStartTime",
+                adjustedAvailability.ToString("O", CultureInfo.InvariantCulture));
+            AppLogger.Write(
+                $"Shifted live DASH availability by {retainedStartShiftSeconds:F3}s to match retained segments. " +
+                $"source={sourceMpd}",
+                "DEBUG");
+        }
+
+        using var writer = new Utf8StringWriter();
+        doc.Save(writer, SaveOptions.DisableFormatting);
+        return writer.ToString();
+    }
+
+    private static long? FindFirstAvailableSegmentNumber(
+        string directory,
+        string? template,
+        string representationId,
+        long minimumNumber)
+    {
+        if (string.IsNullOrWhiteSpace(template)) return null;
+
+        var name = template.Replace("$RepresentationID$", representationId, StringComparison.Ordinal);
+        var numberToken = Regex.Match(name, @"\$Number(?:%0\d+d)?\$");
+        if (!numberToken.Success) return null;
+
+        var prefix = name[..numberToken.Index];
+        var suffix = name[(numberToken.Index + numberToken.Length)..];
+        var pattern = "^" + Regex.Escape(prefix) + @"(?<number>\d+)" + Regex.Escape(suffix) + "$";
+        var filePattern = prefix + "*" + suffix;
+
+        return Directory.EnumerateFiles(directory, filePattern, SearchOption.TopDirectoryOnly)
+            .Select(System.IO.Path.GetFileName)
+            .Where(fileName => fileName is not null)
+            .Select(fileName => Regex.Match(fileName!, pattern))
+            .Where(match => match.Success && long.TryParse(match.Groups["number"].Value,
+                NumberStyles.None, CultureInfo.InvariantCulture, out _))
+            .Select(match => long.Parse(match.Groups["number"].Value,
+                NumberStyles.None, CultureInfo.InvariantCulture))
+            .Where(number => number >= minimumNumber)
+            .DefaultIfEmpty()
+            .Min() is var first && first > 0 ? first : null;
+    }
+
+    public string CreateCombinedManifest(IReadOnlyList<string> sourceMpds, bool staticSnapshot = false)
+    {
+        if (sourceMpds.Count == 0)
+            throw new ArgumentException("At least one recording session is required.", nameof(sourceMpds));
+
+        var sessionDocuments = sourceMpds
+            .Select(path => XDocument.Parse(CreateLiveManifest(path)))
+            .ToArray();
+        var root = new XElement(sessionDocuments[0].Root
+                                ?? throw new InvalidDataException("MPD has no root element."));
+        var ns = root.Name.Namespace;
+        root.Elements(ns + "Period").Remove();
+
+        var durations = sourceMpds.Select(GetDurationSeconds).ToArray();
+        var totalDuration = durations.Sum();
+        var activeIndex = Array.FindLastIndex(sourceMpds.ToArray(), LiveRecordingService.IsActivelyRecording);
+        var anyActive = activeIndex >= 0;
+        var emitDynamic = anyActive && !staticSnapshot;
+        if (staticSnapshot && activeIndex >= 0)
+        {
+            // Steam may still be writing the newest three-second fragment.
+            // Keep it outside the finite snapshot so every advertised point
+            // on libVLC's timeline maps to a complete segment.
+            durations[activeIndex] = Math.Max(0,
+                durations[activeIndex] - GrowingSnapshotTailMarginSeconds);
+            totalDuration = durations.Sum();
+        }
+        var start = 0d;
+
+        for (var index = 0; index < sessionDocuments.Length; index++)
+        {
+            var sourcePeriod = sessionDocuments[index].Root?.Elements(ns + "Period").FirstOrDefault()
+                               ?? throw new InvalidDataException("MPD has no Period element.");
+            var period = new XElement(sourcePeriod);
+            period.SetAttributeValue("id", $"session-{index}");
+            period.SetAttributeValue("start", System.Xml.XmlConvert.ToString(TimeSpan.FromSeconds(start)));
+            if (durations[index] > 0 && (!emitDynamic || index != activeIndex))
+                period.SetAttributeValue("duration", System.Xml.XmlConvert.ToString(TimeSpan.FromSeconds(durations[index])));
+            else if (emitDynamic && index == activeIndex)
+                period.Attribute("duration")?.Remove();
+
+            foreach (var template in period.Descendants(ns + "SegmentTemplate"))
+            {
+                foreach (var attributeName in new[] { "initialization", "media" })
+                {
+                    var attribute = template.Attribute(attributeName);
+                    if (attribute is not null)
+                        attribute.Value = $"s{index}/{attribute.Value}";
+                }
+            }
+
+            root.Add(period);
+            start += durations[index];
+        }
+
+        if (emitDynamic)
+        {
+            root.SetAttributeValue("type", "dynamic");
+            root.SetAttributeValue("minimumUpdatePeriod", "PT1S");
+            root.SetAttributeValue("suggestedPresentationDelay", "PT3S");
+            root.SetAttributeValue("timeShiftBufferDepth", System.Xml.XmlConvert.ToString(TimeSpan.FromSeconds(Math.Max(totalDuration, 1))));
+            root.SetAttributeValue("publishTime", DateTime.UtcNow.ToString("O", CultureInfo.InvariantCulture));
+            var activeRoot = sessionDocuments[activeIndex].Root;
+            var activeAvailabilityText = activeRoot?.Attribute("availabilityStartTime")?.Value;
+            var precedingDuration = durations.Take(activeIndex).Sum();
+            var combinedAvailability = DateTime.TryParse(activeAvailabilityText, CultureInfo.InvariantCulture,
+                DateTimeStyles.AssumeUniversal, out var activeAvailability)
+                ? activeAvailability.ToUniversalTime().Subtract(TimeSpan.FromSeconds(precedingDuration))
+                : DateTime.UtcNow.Subtract(TimeSpan.FromSeconds(Math.Max(totalDuration, 1)));
+            root.SetAttributeValue("availabilityStartTime",
+                combinedAvailability.ToString("O", CultureInfo.InvariantCulture));
+            root.Attribute("mediaPresentationDuration")?.Remove();
+        }
+        else
+        {
+            root.SetAttributeValue("type", "static");
+            root.SetAttributeValue("mediaPresentationDuration", System.Xml.XmlConvert.ToString(TimeSpan.FromSeconds(totalDuration)));
+            root.Attribute("minimumUpdatePeriod")?.Remove();
+            root.Attribute("suggestedPresentationDelay")?.Remove();
+            root.Attribute("publishTime")?.Remove();
+            root.Attribute("availabilityStartTime")?.Remove();
+            root.Attribute("timeShiftBufferDepth")?.Remove();
+        }
+
+        using var writer = new Utf8StringWriter();
+        new XDocument(root).Save(writer, SaveOptions.DisableFormatting);
+        return writer.ToString();
+    }
+
+    public string CreateBridgedLiveManifest(string sourceMpd, int routeIndex)
+    {
+        var doc = XDocument.Parse(CreateLiveManifest(sourceMpd));
+        var root = doc.Root ?? throw new InvalidDataException("MPD has no root element.");
+        var ns = root.Name.Namespace;
+        foreach (var template in root.Descendants(ns + "SegmentTemplate"))
+        {
+            foreach (var attributeName in new[] { "initialization", "media" })
+            {
+                var attribute = template.Attribute(attributeName);
+                if (attribute is not null)
+                    attribute.Value = $"s{routeIndex}/{attribute.Value}";
+            }
+        }
+
+        using var writer = new Utf8StringWriter();
+        doc.Save(writer, SaveOptions.DisableFormatting);
+        return writer.ToString();
+    }
+
     private static string? ResolveFirstSegmentPath(
         string directory,
         string? template,
@@ -202,6 +529,11 @@ public sealed class DashCompatibilityService
 
         try { return System.Xml.XmlConvert.ToTimeSpan(value).TotalSeconds; }
         catch { return 0; }
+    }
+
+    private sealed class Utf8StringWriter : StringWriter
+    {
+        public override Encoding Encoding => new UTF8Encoding(false);
     }
 }
 

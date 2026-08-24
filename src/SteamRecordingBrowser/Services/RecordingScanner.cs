@@ -52,7 +52,9 @@ public sealed class RecordingScanner
             progress?.Report(new ScanProgress(index + 1, files.Count, item.GameName));
         }
 
-        return results.OrderByDescending(x => x.Timestamp).ToList();
+        return CollapseAutomaticRecordings(results)
+            .OrderByDescending(x => x.Timestamp)
+            .ToList();
     }
 
     private RecordingItem BuildItem(string mpdPath, IReadOnlyDictionary<string, string> appNames)
@@ -62,6 +64,7 @@ public sealed class RecordingScanner
 
         var gameId = "";
         var timestamp = File.GetLastWriteTime(mpdPath);
+        var isSavedClip = HasClipMetadata(mpdPath);
 
         var match = Regex.Match(folder, @"^bg_(\d+)_(\d{8})_(\d{6})$", RegexOptions.IgnoreCase);
         if (match.Success)
@@ -94,6 +97,10 @@ public sealed class RecordingScanner
             ? name
             : gameId.Length > 0 ? $"App {gameId}" : "Unknown game";
 
+        var durationSeconds = _dash.GetDurationSeconds(mpdPath);
+        if (durationSeconds <= 0 && match.Success && !isSavedClip)
+            durationSeconds = LiveRecordingService.GetDynamicDurationSeconds(mpdPath);
+
         return new RecordingItem
         {
             Path = mpdPath,
@@ -102,10 +109,68 @@ public sealed class RecordingScanner
             GameName = gameName,
             Timestamp = timestamp,
             SizeBytes = size,
-            DurationSeconds = _dash.GetDurationSeconds(mpdPath),
+            DurationSeconds = durationSeconds,
             ThumbnailPath = FindSteamThumbnail(mpdPath),
-            CoverArtPath = _steam.FindCachedCoverArt(gameId)
+            CoverArtPath = _steam.FindCachedCoverArt(gameId),
+            IsAutoRecording = match.Success && !isSavedClip,
+            IsLive = match.Success && !isSavedClip && LiveRecordingService.IsActivelyRecording(mpdPath),
+            SessionPaths = new[] { mpdPath },
+            SessionStartOffsetsSeconds = new[] { 0d }
         };
+    }
+
+    private static IEnumerable<RecordingItem> CollapseAutomaticRecordings(IReadOnlyCollection<RecordingItem> items)
+    {
+        foreach (var clip in items.Where(item => !item.IsAutoRecording))
+            yield return clip;
+
+        foreach (var group in items.Where(item => item.IsAutoRecording).GroupBy(item => item.GameId))
+        {
+            var sessions = group.OrderBy(item => item.Timestamp).ToList();
+            var primary = sessions.LastOrDefault(item => item.IsLive) ?? sessions[^1];
+            var offsets = new List<double>(sessions.Count);
+            var duration = 0d;
+            foreach (var session in sessions)
+            {
+                offsets.Add(duration);
+                duration += Math.Max(0, session.DurationSeconds);
+            }
+
+            yield return new RecordingItem
+            {
+                Path = primary.Path,
+                Folder = primary.Folder,
+                GameId = primary.GameId,
+                GameName = primary.GameName,
+                Timestamp = sessions[^1].Timestamp,
+                SizeBytes = sessions.Sum(session => session.SizeBytes),
+                DurationSeconds = duration,
+                ThumbnailPath = primary.ThumbnailPath,
+                CoverArtPath = primary.CoverArtPath,
+                IsAutoRecording = true,
+                IsLive = sessions.Any(session => session.IsLive),
+                SessionPaths = sessions.Select(session => session.Path).ToArray(),
+                SessionStartOffsetsSeconds = offsets,
+                IsFavorite = sessions.Any(session => session.IsFavorite),
+                Description = primary.Description,
+                Tags = sessions.SelectMany(session => session.Tags)
+                    .Distinct(StringComparer.OrdinalIgnoreCase)
+                    .OrderBy(tag => tag, StringComparer.OrdinalIgnoreCase)
+                    .ToArray()
+            };
+        }
+    }
+
+    private static bool HasClipMetadata(string recordingPath)
+    {
+        var directory = new DirectoryInfo(System.IO.Path.GetDirectoryName(recordingPath)!);
+        while (directory is not null)
+        {
+            if (File.Exists(System.IO.Path.Combine(directory.FullName, "clip.pb")))
+                return true;
+            directory = directory.Parent;
+        }
+        return false;
     }
 
     public static string? FindSteamThumbnail(string recordingPath)

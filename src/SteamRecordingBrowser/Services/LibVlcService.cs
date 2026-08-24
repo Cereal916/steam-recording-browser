@@ -1,4 +1,5 @@
 using System.IO;
+using System.Diagnostics;
 using LibVLCSharp.Shared;
 using SteamRecordingBrowser.Models;
 
@@ -9,6 +10,7 @@ public sealed class LibVlcService : IDisposable
     private readonly LibVLC _libVlc;
     private readonly DashCompatibilityService _dash;
     private readonly FfmpegExportService _ffmpeg;
+    private long _lastFrameTimingDiagnostic;
 
     public LibVLC LibVlc => _libVlc;
 
@@ -18,17 +20,77 @@ public sealed class LibVlcService : IDisposable
         _ffmpeg = new FfmpegExportService(dash);
         _libVlc = new LibVLC(
             "--no-video-title-show",
+            // The WPF HWND is an SDR surface. Force libVLC to tone-map HDR
+            // instead of repeatedly failing Rec.2020/PQ screen conversion.
+            "--d3d11-hdr-mode=never",
             "--quiet");
+        _libVlc.Log += LibVlc_Log;
+    }
+
+    private void LibVlc_Log(object? sender, LogEventArgs e)
+    {
+        var level = e.Level.ToString();
+        var module = e.Module ?? "unknown";
+        var relevantModule = module.Contains("dash", StringComparison.OrdinalIgnoreCase) ||
+                             module.Contains("adaptive", StringComparison.OrdinalIgnoreCase) ||
+                             module.Contains("http", StringComparison.OrdinalIgnoreCase) ||
+                             module.Contains("demux", StringComparison.OrdinalIgnoreCase) ||
+                             module.Contains("decoder", StringComparison.OrdinalIgnoreCase);
+        var importantLevel = level.Contains("Warn", StringComparison.OrdinalIgnoreCase) ||
+                             level.Contains("Error", StringComparison.OrdinalIgnoreCase);
+        var benignNativeDiagnostic =
+            module.Equals("drawable", StringComparison.OrdinalIgnoreCase) &&
+            e.Message.Contains("unsupported control query", StringComparison.OrdinalIgnoreCase) ||
+            module.Equals("direct3d11", StringComparison.OrdinalIgnoreCase) &&
+            e.Message.Contains("SetThumbNailClip failed", StringComparison.OrdinalIgnoreCase) ||
+            module.Equals("mp4", StringComparison.OrdinalIgnoreCase) &&
+            (e.Message.Contains("elst box found", StringComparison.OrdinalIgnoreCase) ||
+             e.Message.Contains("no chunk defined", StringComparison.OrdinalIgnoreCase) ||
+             e.Message.Contains("STTS table of 0 entries", StringComparison.OrdinalIgnoreCase)) ||
+            module.Equals("main", StringComparison.OrdinalIgnoreCase) &&
+            (e.Message.Contains("picture is too late to be displayed", StringComparison.OrdinalIgnoreCase) ||
+             e.Message.Contains("More than 11 late frames", StringComparison.OrdinalIgnoreCase));
+        var frameTimingDiagnostic =
+            e.Message.Contains("picture is too late to be displayed", StringComparison.OrdinalIgnoreCase) ||
+            e.Message.Contains("More than 11 late frames", StringComparison.OrdinalIgnoreCase);
+        if (frameTimingDiagnostic)
+        {
+            var now = Stopwatch.GetTimestamp();
+            var previous = Interlocked.Read(ref _lastFrameTimingDiagnostic);
+            if (previous != 0 && Stopwatch.GetElapsedTime(previous, now) < TimeSpan.FromSeconds(5))
+                return;
+            Interlocked.Exchange(ref _lastFrameTimingDiagnostic, now);
+        }
+        if (importantLevel || relevantModule)
+        {
+            var appLevel = benignNativeDiagnostic || !importantLevel ? "DEBUG" : "WARN";
+            AppLogger.Write($"libVLC [{level}] [{module}] {e.Message}", appLevel);
+        }
     }
 
     public Media CreatePlaybackMedia(string recordingPath)
     {
         var manifest = _dash.GetPlaybackManifest(recordingPath);
-        var media = new Media(_libVlc, new Uri(manifest));
+        return CreatePlaybackMedia(new Uri(manifest), isLive: false);
+    }
+
+    public LiveDashServer CreateLiveDashServer(IReadOnlyList<string> recordingPaths) => new(_dash, recordingPaths);
+
+    public Media CreatePlaybackMedia(Uri source, bool isLive, bool useHardwareDecoding = true)
+    {
+        var media = new Media(_libVlc, source);
 
         // Prefer hardware-assisted decoding when the installed GPU/driver and
         // codec support it. libVLC falls back to software when necessary.
-        media.AddOption(":avcodec-hw=any");
+        media.AddOption(useHardwareDecoding ? ":avcodec-hw=any" : ":avcodec-hw=none");
+        if (!useHardwareDecoding)
+            AppLogger.Write($"Software video decoding selected for {source}.", "DEBUG");
+        if (isLive)
+        {
+            media.AddOption(":network-caching=1000");
+            media.AddOption(":live-caching=1000");
+            media.AddOption(":http-reconnect=true");
+        }
 
         return media;
     }
@@ -130,7 +192,11 @@ public sealed class LibVlcService : IDisposable
         }
     }
 
-    public void Dispose() => _libVlc.Dispose();
+    public void Dispose()
+    {
+        _libVlc.Log -= LibVlc_Log;
+        _libVlc.Dispose();
+    }
 }
 
 public enum ExportVideoCodec

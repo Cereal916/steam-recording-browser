@@ -194,9 +194,31 @@
             <RowDefinition Height="Auto"/>
         </Grid.RowDefinitions>
 
-        <Grid Grid.Row="0" Background="Black">
-            <vlc:VideoView x:Name="VideoView" Focusable="False"/>
-
+        <Grid Grid.Row="0" Background="#000000">
+            <vlc:VideoView x:Name="VideoView"
+                           Focusable="False"
+                           Background="#000000">
+                <!-- LibVLCSharp renders VideoView content in its foreground
+                     HWND, above the native Direct3D surface. Keep this cover
+                     visible until decoded timestamps advance so native white
+                     clears can never reach the user during source changes. -->
+                <Border x:Name="VideoTransitionCover"
+                        Background="#000000"
+                        IsHitTestVisible="False"/>
+            </vlc:VideoView>
+            <Border x:Name="LivePlaybackBadge"
+                    Visibility="Collapsed"
+                    HorizontalAlignment="Left" VerticalAlignment="Top"
+                    Margin="18" Padding="10,6"
+                    Background="#E0A21E2B" BorderBrush="#FF6673"
+                    BorderThickness="1" CornerRadius="5"
+                    IsHitTestVisible="False">
+                <StackPanel Orientation="Horizontal">
+                    <Ellipse Width="8" Height="8" Fill="#FFFFFF" Margin="0,0,7,0"/>
+                    <TextBlock Text="LIVE AUTO RECORDING" Foreground="#FFFFFF"
+                               FontWeight="Bold" FontSize="11"/>
+                </StackPanel>
+            </Border>
         </Grid>
 
         <Grid Grid.Row="1" Background="#151922">
@@ -234,7 +256,7 @@
                             MouseLeave="Timeline_MouseLeave"
                             ValueChanged="Timeline_ValueChanged"
                             KeyDown="Timeline_KeyDown"
-                            ToolTip="Click to seek • drag to scrub • Shift+drag for fine control • hover for frame preview"/>
+                            ToolTip="Click to seek • drag to scrub • Shift+drag for fine control • hover for frame preview • blue markers indicate new sessions"/>
 
                     <Canvas x:Name="TimelineTickCanvas"
                             Grid.Row="1"
@@ -274,7 +296,8 @@
                                         ClipToBounds="True"
                                         CornerRadius="3">
                                     <Grid>
-                                        <vlc:VideoView x:Name="PreviewVideoView"/>
+                                        <vlc:VideoView x:Name="PreviewVideoView"
+                                                       Background="#000000"/>
                                     </Grid>
                                 </Border>
                                 <TextBlock x:Name="PreviewTimeLabel"
@@ -358,6 +381,10 @@
                             Tag="5000" ToolTip="Forward 5 seconds" Click="SeekButton_Click"/>
                     <Button Content="+30s" Width="54" Height="32" Padding="6,4"
                             Tag="30000" ToolTip="Forward 30 seconds" Click="SeekButton_Click"/>
+                    <Button x:Name="GoLiveButton" Content="● LIVE" Height="32" MinWidth="72"
+                            Margin="8,0,0,0" Padding="9,4" Visibility="Collapsed"
+                            Foreground="#FFFFFF" Background="#8F1D28" BorderBrush="#FF6673"
+                            ToolTip="Jump to the newest playable segment" Click="GoLive_Click"/>
                     <Border Width="36"
                             Height="32"
                             Margin="8,0,0,0"

@@ -44,6 +44,9 @@ folder containing your Steam recording sessions.
 - Startup progress UI
 - Self-contained Windows x64 deployment
 - Live diagnostic log viewer with pause, search, severity toggles, and bounded history
+- One combined background recording per game, with live and saved-clip badges
+- Session-boundary markers for combined recordings on the player timeline
+- Near-live playback of active Steam rolling recordings with a **Go live** control
 
 ## Technology
 

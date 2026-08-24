@@ -6,7 +6,9 @@ namespace SteamRecordingBrowser.Services;
 
 public static class AppLogger
 {
+    private const int MaximumSessionEntries = 5_000;
     private static readonly object Gate = new();
+    private static readonly Queue<LogEntry> SessionEntries = new();
     private static readonly Regex LogLinePattern = new(
         @"^\[(?<timestamp>[^\]]+)\] \[(?<level>[^\]]+)\] (?<message>.*)$",
         RegexOptions.Compiled);
@@ -27,6 +29,9 @@ public static class AppLogger
                     LogPath,
                     entry.ToLogText() + Environment.NewLine,
                     new UTF8Encoding(false));
+                if (SessionEntries.Count == MaximumSessionEntries)
+                    SessionEntries.Dequeue();
+                SessionEntries.Enqueue(entry);
             }
 
             try { EntryWritten?.Invoke(entry); } catch { }
@@ -83,6 +88,15 @@ public static class AppLogger
         {
             return Array.Empty<LogEntry>();
         }
+    }
+
+    public static IReadOnlyList<LogEntry> ReadCurrentSessionEntries(int maximumEntries)
+    {
+        if (maximumEntries <= 0)
+            return Array.Empty<LogEntry>();
+
+        lock (Gate)
+            return SessionEntries.TakeLast(maximumEntries).ToArray();
     }
 
     private static void AddBounded(Queue<LogEntry> entries, LogEntry entry, int maximumEntries)

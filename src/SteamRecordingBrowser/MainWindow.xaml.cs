@@ -64,6 +64,7 @@ public partial class MainWindow : Window
     // Clip-card previews intentionally share exactly one libVLC decoder.
     private readonly MediaPlayer _clipPreviewPlayer;
     private readonly DispatcherTimer _clipPreviewDelayTimer;
+    private readonly DispatcherTimer _liveRecordingTimer;
     private Media? _clipPreviewMedia;
     private RecordingItem? _clipPreviewItem;
     private FrameworkElement? _clipPreviewCard;
@@ -94,9 +95,13 @@ public partial class MainWindow : Window
 
         _clipPreviewDelayTimer = new DispatcherTimer
         {
-            Interval = TimeSpan.FromMilliseconds(300)
+            Interval = TimeSpan.FromMilliseconds(500)
         };
         _clipPreviewDelayTimer.Tick += ClipPreviewDelayTimer_Tick;
+
+        _liveRecordingTimer = new DispatcherTimer { Interval = TimeSpan.FromSeconds(2) };
+        _liveRecordingTimer.Tick += (_, _) => RefreshLiveRecordingStates();
+        _liveRecordingTimer.Start();
 
         _clipPreviewPlayer.EncounteredError += ClipPreviewPlayer_EncounteredError;
         _clipPreviewPlayer.EndReached += ClipPreviewPlayer_EndReached;
@@ -152,6 +157,7 @@ public partial class MainWindow : Window
             _clipPreviewPlayer.EncounteredError -= ClipPreviewPlayer_EncounteredError;
             _clipPreviewPlayer.EndReached -= ClipPreviewPlayer_EndReached;
             _clipPreviewPlayer.TimeChanged -= ClipPreviewPlayer_TimeChanged;
+            _liveRecordingTimer.Stop();
 
             ClipPreviewVideoView.MediaPlayer = null;
             _clipPreviewPlayer.Dispose();
@@ -159,10 +165,12 @@ public partial class MainWindow : Window
             _vlc.Dispose();
         };
 
-        AppLogger.Write("============================================================");
-        AppLogger.Write($"Steam Recording Browser v{AppInfo.Version} starting.");
-        AppLogger.Write($".NET runtime: {System.Runtime.InteropServices.RuntimeInformation.FrameworkDescription}");
-        AppLogger.Write("Runtime architecture: native C# WPF + bundled libVLC.");
+    }
+
+    private void RefreshLiveRecordingStates()
+    {
+        foreach (var item in _allItems.Where(item => item.IsAutoRecording))
+            item.IsLive = item.SessionPaths.Any(LiveRecordingService.IsActivelyRecording);
     }
 
     private async Task LoadRecordingsAsync(bool isInitialLoad = false)
@@ -312,6 +320,7 @@ public partial class MainWindow : Window
             query = query.Where(x =>
                 x.GameName.Contains(captured, StringComparison.OrdinalIgnoreCase) ||
                 x.Description.Contains(captured, StringComparison.OrdinalIgnoreCase) ||
+                x.RecordingTypeLabel.Contains(captured, StringComparison.OrdinalIgnoreCase) ||
                 x.Tags.Any(t => t.Contains(captured, StringComparison.OrdinalIgnoreCase)));
         }
 
@@ -401,7 +410,7 @@ public partial class MainWindow : Window
             _clipPreviewDelayTimer.Stop();
 
             if (_clipPreviewItem != item)
-                StopClipPreview(closePopup: false);
+                StopClipPreview(closePopup: true);
 
             _clipPreviewCard = card;
             _clipPreviewItem = item;
@@ -418,11 +427,10 @@ public partial class MainWindow : Window
             ClipPreviewUnavailableText.Visibility = Visibility.Collapsed;
             ClipPreviewThumbnail.Visibility = Visibility.Visible;
 
-            // Open immediately with the exact Steam thumbnail. The video
-            // decoder is deliberately delayed so sweeping the mouse across
-            // cards does not repeatedly spin up DASH playback.
-            ClipPreviewPopup.IsOpen = true;
-
+            // Require a continuous hover before opening the enlarged preview
+            // or starting its decoder. This avoids popup churn and expensive
+            // DASH initialization while cards move under the pointer during
+            // tile-view scrolling.
             _clipPreviewDelayTimer.Start();
         }
         catch (Exception ex)
@@ -449,9 +457,10 @@ public partial class MainWindow : Window
         var card = _clipPreviewCard;
         var generation = _clipPreviewGeneration;
 
-        if (item is null || card is null || !card.IsMouseOver || !ClipPreviewPopup.IsOpen)
+        if (item is null || card is null || !card.IsMouseOver)
             return;
 
+        ClipPreviewPopup.IsOpen = true;
         StartClipVideoPreview(item, generation);
     }
 
@@ -690,6 +699,12 @@ public partial class MainWindow : Window
 
         try
         {
+            // The hover preview is hosted inside a Popup. If that popup closes
+            // while its decoder is still running, libVLC can lose the embedded
+            // HWND and create an independent "VLC Direct3D11" window.
+            _clipPreviewGeneration++;
+            StopClipPreview(closePopup: true);
+
             var player = new PlayerWindow(_vlc, _metadata, item) { Owner = this };
             player.Closing += (_, _) =>
             {

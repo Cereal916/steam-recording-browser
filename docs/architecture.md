@@ -72,6 +72,22 @@ tail of the existing file, batches live UI updates, virtualizes its entry list,
 and retains at most 5,000 displayed or paused entries. Closing the viewer stops
 its timer and unsubscribes from logger events, leaving no ongoing UI overhead.
 
+### Active rolling recordings
+
+`RecordingScanner` distinguishes saved clips by Steam's ancestor `clip.pb`
+metadata and treats unmatched `bg_*` sessions as automatic background
+recordings. Automatic sessions are grouped into one library item per game and
+served as consecutive DASH periods, with their boundaries shown on the player
+timeline. `LiveRecordingService` marks an automatic recording live while its
+manifest or media segments continue changing.
+
+The normal static libVLC path remains unchanged for finalized recordings. An
+active player lazily starts `LiveDashServer` on an ephemeral loopback port. The
+server regenerates a dynamic compatibility MPD, serves existing fragments
+directly with byte-range support, rejects fragments Steam is still writing, and
+returns to a static MPD after recording activity stops. It does not copy or
+retain video data and is disposed with the player window.
+
 ### `PlayerWindow`
 
 WPF player using `LibVLCSharp.WPF.VideoView`.

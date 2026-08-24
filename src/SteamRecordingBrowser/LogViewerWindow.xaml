@@ -39,6 +39,8 @@
                 <Button x:Name="PauseButton" Content="Pause" MinWidth="82" Click="Pause_Click"/>
                 <Button Content="Clear display" MinWidth="110" Margin="8,0,0,0" Click="Clear_Click"
                         ToolTip="Clear this window without deleting the log file"/>
+                <Button Content="Copy selected" MinWidth="112" Margin="8,0,0,0" Click="CopySelected_Click"
+                        ToolTip="Copy selected entries (Ctrl+C)"/>
                 <Button Content="Open file" MinWidth="92" Margin="8,0,0,0" Click="OpenFile_Click"/>
             </StackPanel>
         </Grid>
@@ -50,6 +52,8 @@
                 <ColumnDefinition Width="Auto"/>
             </Grid.ColumnDefinitions>
             <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
+                <CheckBox x:Name="DebugFilterToggle" Content="Debug" IsChecked="False"
+                          Foreground="#8994A5" Margin="0,0,14,0" Click="LevelFilter_Click"/>
                 <CheckBox x:Name="InfoFilterToggle" Content="Info" IsChecked="True"
                           Foreground="#D5DBE5" Margin="0,0,14,0" Click="LevelFilter_Click"/>
                 <CheckBox x:Name="WarnFilterToggle" Content="Warn" IsChecked="True"
@@ -68,6 +72,8 @@
                 BorderThickness="1" CornerRadius="6" ClipToBounds="True">
             <ListBox x:Name="LogList"
                      Background="Transparent" BorderThickness="0"
+                     SelectionMode="Extended"
+                     PreviewKeyDown="LogList_PreviewKeyDown"
                      ItemsSource="{Binding Entries}"
                      FontFamily="Cascadia Mono, Consolas"
                      FontSize="12.5"
@@ -78,6 +84,12 @@
                      VirtualizingPanel.VirtualizationMode="Recycling"
                      ScrollViewer.ScrollChanged="LogList_ScrollChanged"
                      PreviewMouseWheel="LogList_PreviewMouseWheel">
+                <ListBox.ContextMenu>
+                    <ContextMenu Background="#151922" BorderBrush="#343C49" Foreground="#F4F7FB">
+                        <MenuItem Header="Copy selected" Click="CopySelected_Click"
+                                  Background="#151922" Foreground="#F4F7FB"/>
+                    </ContextMenu>
+                </ListBox.ContextMenu>
                 <ListBox.ItemContainerStyle>
                     <Style TargetType="ListBoxItem">
                         <Setter Property="HorizontalContentAlignment" Value="Stretch"/>
@@ -86,6 +98,9 @@
                         <Setter Property="Background" Value="Transparent"/>
                         <Setter Property="BorderThickness" Value="0"/>
                         <Style.Triggers>
+                            <DataTrigger Binding="{Binding Level}" Value="DEBUG">
+                                <Setter Property="Foreground" Value="#8994A5"/>
+                            </DataTrigger>
                             <DataTrigger Binding="{Binding Level}" Value="WARN">
                                 <Setter Property="Foreground" Value="#F2C46D"/>
                             </DataTrigger>

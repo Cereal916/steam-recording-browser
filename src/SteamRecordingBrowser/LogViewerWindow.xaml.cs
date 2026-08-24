@@ -44,7 +44,7 @@ public partial class LogViewerWindow : Window
     private async void LogViewerWindow_Loaded(object sender, RoutedEventArgs e)
     {
         var generation = _loadGeneration;
-        var recent = await Task.Run(() => AppLogger.ReadRecentEntries(MaximumEntries));
+        var recent = await Task.Run(() => AppLogger.ReadCurrentSessionEntries(MaximumEntries));
         if (generation == _loadGeneration)
         {
             _programmaticScroll = true;
@@ -120,6 +120,7 @@ public partial class LogViewerWindow : Window
             return false;
         var levelEnabled = entry.Level.ToUpperInvariant() switch
         {
+            "DEBUG" => DebugFilterToggle.IsChecked == true,
             "INFO" => InfoFilterToggle.IsChecked == true,
             "WARN" => WarnFilterToggle.IsChecked == true,
             "ERROR" => ErrorFilterToggle.IsChecked == true,
@@ -176,6 +177,39 @@ public partial class LogViewerWindow : Window
         if (!File.Exists(AppLogger.LogPath))
             File.WriteAllText(AppLogger.LogPath, "");
         Process.Start(new ProcessStartInfo(AppLogger.LogPath) { UseShellExecute = true });
+    }
+
+    private void CopySelected_Click(object sender, RoutedEventArgs e) => CopySelectedEntries();
+
+    private void LogList_PreviewKeyDown(object sender, KeyEventArgs e)
+    {
+        if (e.Key == Key.C && Keyboard.Modifiers.HasFlag(ModifierKeys.Control))
+        {
+            CopySelectedEntries();
+            e.Handled = true;
+        }
+    }
+
+    private void CopySelectedEntries()
+    {
+        var selected = LogList.SelectedItems.Cast<LogEntry>().ToArray();
+        if (selected.Length == 0)
+        {
+            StatusText.Text = "Select one or more log entries to copy.";
+            return;
+        }
+
+        try
+        {
+            Clipboard.SetText(string.Join(Environment.NewLine,
+                selected.Select(entry => entry.ToLogText())));
+            StatusText.Text = $"Copied {selected.Length:N0} log entr{(selected.Length == 1 ? "y" : "ies")}.";
+        }
+        catch (Exception ex)
+        {
+            AppLogger.WriteException("Could not copy log entries", ex);
+            StatusText.Text = "Could not access the clipboard.";
+        }
     }
 
     private void LogList_PreviewMouseWheel(object sender, MouseWheelEventArgs e)
