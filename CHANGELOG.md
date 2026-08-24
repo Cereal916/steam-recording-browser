@@ -6,6 +6,8 @@ The project adopts semantic versioning beginning with **1.0.0**.
 
 ## Unreleased
 
+## 1.4.0 - 2026-08-24
+
 ### Added
 
 - Added automatic 10 MB log rotation with five retained archives, log storage
