@@ -48,17 +48,6 @@
                 </Setter.Value>
             </Setter>
         </Style>
-        <Style x:Key="TimestampTextBox" TargetType="TextBox">
-            <Setter Property="Foreground" Value="#F4F7FB"/>
-            <Setter Property="Background" Value="#0B0E13"/>
-            <Setter Property="BorderBrush" Value="#46556B"/>
-            <Setter Property="BorderThickness" Value="1"/>
-            <Setter Property="Padding" Value="10,6"/>
-            <Setter Property="FontSize" Value="15"/>
-            <Setter Property="FontWeight" Value="SemiBold"/>
-            <Setter Property="TextAlignment" Value="Center"/>
-            <Setter Property="CaretBrush" Value="#66C0F4"/>
-        </Style>
         <Style x:Key="DarkVolumeSlider" TargetType="Slider">
             <Setter Property="Height" Value="24"/>
             <Setter Property="Focusable" Value="True"/>
@@ -225,14 +214,14 @@
 
         <Grid Grid.Row="1" Background="#151922">
             <Grid.RowDefinitions>
-                <RowDefinition Height="116"/>
+                <RowDefinition Height="Auto"/>
                 <RowDefinition Height="54"/>
                 <RowDefinition Height="Auto"/>
             </Grid.RowDefinitions>
 
             <Grid Grid.Row="0">
                 <Grid.RowDefinitions>
-                    <RowDefinition Height="70"/>
+                    <RowDefinition Height="Auto"/>
                     <RowDefinition Height="46"/>
                 </Grid.RowDefinitions>
                 <Grid.ColumnDefinitions>
@@ -243,8 +232,8 @@
                 <Grid Grid.Row="0" Grid.Column="0" Grid.ColumnSpan="2" Margin="14,2,14,0">
                     <Grid.RowDefinitions>
                         <RowDefinition Height="30"/>
-                        <RowDefinition Height="18"/>
-                        <RowDefinition Height="22"/>
+                        <RowDefinition Height="Auto"/>
+                        <RowDefinition Height="34"/>
                     </Grid.RowDefinitions>
                     <Slider x:Name="Timeline"
                             Style="{StaticResource DarkTimelineSlider}"
@@ -258,28 +247,33 @@
                             MouseLeave="Timeline_MouseLeave"
                             ValueChanged="Timeline_ValueChanged"
                             KeyDown="Timeline_KeyDown"
-                            ToolTip="Click to seek • drag to scrub • Shift+drag for fine control • hover for frame preview • blue markers indicate new sessions"/>
+                            ToolTip="Fine scrubbing: hold Shift while dragging the timeline."
+                            ToolTipService.InitialShowDelay="700"
+                            ToolTipService.ShowDuration="12000"/>
 
                     <Canvas x:Name="TimelineTickCanvas"
                             Grid.Row="1"
                             Height="18"
                             SizeChanged="TimelineTickCanvas_SizeChanged"/>
 
-                    <Button x:Name="TimeButton"
-                            Grid.Row="2"
+                    <Border Grid.Row="2"
+                            MinWidth="300"
                             HorizontalAlignment="Center"
-                            Margin="0,1,0,0"
-                            Padding="10,1"
-                            Background="Transparent"
-                            BorderBrush="Transparent"
-                            ToolTip="Go to an exact timestamp"
-                            Click="ExactTime_Click">
+                            VerticalAlignment="Center"
+                            Margin="0,3,0,1"
+                            Padding="16,4"
+                            Background="#0F141C"
+                            BorderBrush="#2B3442"
+                            BorderThickness="1"
+                            CornerRadius="5">
                         <TextBlock x:Name="TimeLabel"
-                                   Foreground="#B8C2D0"
-                                   FontSize="11"
+                                   HorizontalAlignment="Center"
+                                   TextAlignment="Center"
+                                   Foreground="#D5DDE8"
+                                   FontSize="12"
                                    FontWeight="SemiBold"
                                    Text="0:00 / 0:00"/>
-                    </Button>
+                    </Border>
 
                     <Popup x:Name="TimelinePreviewPopup"
                            Placement="Absolute"
@@ -305,61 +299,11 @@
                                            Text="0:00"
                                            HorizontalAlignment="Center"
                                            Foreground="#F4F7FB"
+                                           FontSize="12"
                                            FontWeight="SemiBold"
                                            Margin="0,5,0,0"/>
                             </StackPanel>
                         </Border>
-                    </Popup>
-                    <Popup x:Name="ExactTimePopup"
-                       PlacementTarget="{Binding ElementName=TimeButton}"
-                       Placement="Bottom"
-                       HorizontalOffset="0"
-                       VerticalOffset="4"
-                       AllowsTransparency="True"
-                       StaysOpen="False">
-                    <Border Width="250"
-                            Padding="12"
-                            Background="#11151C"
-                            BorderBrush="#46556B"
-                            BorderThickness="1"
-                            CornerRadius="7">
-                        <Border.Effect>
-                            <DropShadowEffect Color="#000000"
-                                              BlurRadius="12"
-                                              ShadowDepth="3"
-                                              Opacity="0.65"/>
-                        </Border.Effect>
-                        <StackPanel>
-                            <TextBlock Text="Go to timestamp"
-                                       Foreground="#F4F7FB"
-                                       FontWeight="SemiBold"
-                                       Margin="0,0,0,7"/>
-                            <Grid>
-                                <Grid.ColumnDefinitions>
-                                    <ColumnDefinition Width="*"/>
-                                    <ColumnDefinition Width="Auto"/>
-                                </Grid.ColumnDefinitions>
-                                <TextBox x:Name="ExactTimeBox"
-                                         Style="{StaticResource TimestampTextBox}"
-                                         ToolTip="Seconds, MM:SS, or HH:MM:SS"
-                                         KeyDown="ExactTimeBox_KeyDown"/>
-                                <Button Grid.Column="1"
-                                        Content="Go"
-                                        Width="48"
-                                        Margin="8,0,0,0"
-                                        Click="ApplyExactTime_Click"/>
-                            </Grid>
-                            <TextBlock x:Name="TimestampValidationText"
-                                       Foreground="#FF8A8A"
-                                       FontSize="11"
-                                       Margin="1,6,0,0"
-                                       Visibility="Collapsed"/>
-                            <TextBlock Text="Enter to seek  •  Esc to close"
-                                       Foreground="#7F8998"
-                                       FontSize="10"
-                                       Margin="1,6,0,0"/>
-                        </StackPanel>
-                    </Border>
                     </Popup>
                 </Grid>
 
@@ -517,7 +461,8 @@
                 </DockPanel>
             </Border>
 
-            <Border Grid.Row="2"
+            <Border x:Name="AnnotationPanel"
+                    Grid.Row="2"
                     BorderBrush="#2B3240"
                     BorderThickness="0,1,0,0"
                     Background="#11151C"

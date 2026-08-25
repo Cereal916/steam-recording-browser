@@ -141,6 +141,79 @@ public sealed class LiveRecordingServiceTests
     }
 
     [Fact]
+    public void CombinedSnapshotDuration_ExcludesIncompleteLiveTail()
+    {
+        using var recording = new TemporaryRecording(Manifest);
+        File.WriteAllBytes(Path.Combine(recording.DirectoryPath, "init-stream0.m4s"), [0, 1, 2]);
+        foreach (var number in Enumerable.Range(1, 10))
+            File.WriteAllBytes(Path.Combine(recording.DirectoryPath,
+                $"chunk-stream0-{number:D5}.m4s"), [0, 1, 2]);
+
+        var dash = new DashCompatibilityService();
+        var duration = dash.GetCombinedDurationSeconds([recording.ManifestPath], staticSnapshot: true);
+        var snapshot = dash.CreateCombinedManifest([recording.ManifestPath], staticSnapshot: true);
+
+        Assert.Equal(27, duration);
+        Assert.Contains("mediaPresentationDuration=\"PT27S\"", snapshot);
+    }
+
+    [Fact]
+    public void LiveSnapshotTimeline_MapsActiveSessionIntoCombinedHistory()
+    {
+        using var finalized = new TemporaryRecording(Manifest);
+        var finalizedInit = Path.Combine(finalized.DirectoryPath, "init-stream0.m4s");
+        File.WriteAllBytes(finalizedInit, [0, 1, 2]);
+        File.SetLastWriteTimeUtc(finalized.ManifestPath, DateTime.UtcNow.AddMinutes(-1));
+        File.SetLastWriteTimeUtc(finalizedInit, DateTime.UtcNow.AddMinutes(-1));
+
+        using var active = new TemporaryRecording(Manifest);
+        File.WriteAllBytes(Path.Combine(active.DirectoryPath, "init-stream0.m4s"), [0, 1, 2]);
+        foreach (var number in Enumerable.Range(1, 10))
+            File.WriteAllBytes(Path.Combine(active.DirectoryPath,
+                $"chunk-stream0-{number:D5}.m4s"), [0, 1, 2]);
+
+        using var server = new LiveDashServer(
+            new DashCompatibilityService(),
+            [finalized.ManifestPath, active.ManifestPath]);
+        var timeline = server.GetSnapshotTimeline();
+
+        Assert.Equal(20_000, timeline.ActiveSessionOffsetMilliseconds);
+        Assert.Equal(27_000, timeline.ActiveSessionDurationMilliseconds);
+        Assert.Equal(47_000, timeline.TotalDurationMilliseconds);
+        Assert.Collection(
+            timeline.Sessions,
+            session =>
+            {
+                Assert.Equal(0, session.Index);
+                Assert.Equal(0, session.OffsetMilliseconds);
+                Assert.Equal(20_000, session.DurationMilliseconds);
+                Assert.Equal(10_000, session.ClockStartOffsetMilliseconds);
+            },
+            session =>
+            {
+                Assert.Equal(1, session.Index);
+                Assert.Equal(20_000, session.OffsetMilliseconds);
+                Assert.Equal(27_000, session.DurationMilliseconds);
+                Assert.Equal(10_000, session.ClockStartOffsetMilliseconds);
+            });
+    }
+
+    [Fact]
+    public void ActiveSnapshotDuration_ExcludesPrunedAndSafetySegments()
+    {
+        using var recording = new TemporaryRecording(Manifest);
+        File.WriteAllBytes(Path.Combine(recording.DirectoryPath, "init-stream0.m4s"), [0, 1, 2]);
+        foreach (var number in Enumerable.Range(21, 80))
+            File.WriteAllBytes(Path.Combine(recording.DirectoryPath,
+                $"chunk-stream0-{number:D5}.m4s"), [0, 1, 2]);
+
+        var dash = new DashCompatibilityService();
+
+        Assert.Equal(177, dash.GetSnapshotDurationSeconds(recording.ManifestPath));
+        Assert.Equal(130, dash.GetSnapshotClockOffsetSeconds(recording.ManifestPath));
+    }
+
+    [Fact]
     public async Task LiveDashServer_ServesManifestAndSegmentRanges()
     {
         using var recording = new TemporaryRecording(Manifest);
@@ -152,9 +225,19 @@ public sealed class LiveRecordingServiceTests
 
         using var server = new LiveDashServer(new DashCompatibilityService(), new[] { recording.ManifestPath });
         using var client = new HttpClient();
-        var manifest = await client.GetStringAsync(server.ManifestUri, cancellationToken);
+        var firstSnapshotUri = server.CreateSnapshotUri();
+        var secondSnapshotUri = server.CreateSnapshotUri();
+        Assert.NotEqual(firstSnapshotUri, secondSnapshotUri);
+        var manifest = await client.GetStringAsync(firstSnapshotUri, cancellationToken);
         Assert.Contains("type=\"static\"", manifest);
         Assert.Contains("mediaPresentationDuration=", manifest);
+
+        var sessionManifest = await client.GetStringAsync(server.CreateSessionSnapshotUri(0), cancellationToken);
+        var sessionDocument = System.Xml.Linq.XDocument.Parse(sessionManifest);
+        var sessionNamespace = sessionDocument.Root!.Name.Namespace;
+        Assert.Single(sessionDocument.Root.Elements(sessionNamespace + "Period"));
+        Assert.Contains("initialization=\"/s0/init-stream$RepresentationID$.m4s\"", sessionManifest);
+        Assert.Contains("media=\"/s0/chunk-stream$RepresentationID$-$Number%05d$.m4s\"", sessionManifest);
 
         using var request = new HttpRequestMessage(HttpMethod.Get,
             new Uri(server.ManifestUri, "s0/init-stream0.m4s"));

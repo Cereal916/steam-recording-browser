@@ -466,9 +466,9 @@
                                     </Border>
                                 </Grid>
                                 <TextBlock Text="{Binding DisplayTime}" Foreground="#929DAD" FontSize="12" Margin="0,4,0,0"/>
-                                <TextBlock Text="{Binding Description}" Foreground="#CDD4DF" Margin="0,9,0,0"
+                                <TextBlock Text="{Binding AnnotationDescription}" Foreground="#CDD4DF" Margin="0,9,0,0"
                                            TextTrimming="CharacterEllipsis"/>
-                                <TextBlock Text="{Binding TagDisplay}" Foreground="#71ABD0" FontSize="12" Margin="0,5,0,0"/>
+                                <TextBlock Text="{Binding AnnotationTagDisplay}" Foreground="#71ABD0" FontSize="12" Margin="0,5,0,0"/>
                             </StackPanel>
 
                             <StackPanel Grid.Column="2" VerticalAlignment="Center" HorizontalAlignment="Right">
@@ -483,13 +483,13 @@
             </ListView.ItemTemplate>
 
             <ListView.ContextMenu>
-                <ContextMenu>
+                <ContextMenu Opened="RecordingContextMenu_Opened">
                     <MenuItem Header="Play" Click="PlayMenu_Click"/>
                     <MenuItem Header="Export to MP4…" Click="ExportMenu_Click"/>
                     <Separator/>
                     <MenuItem Header="Toggle favorite" Click="FavoriteMenu_Click"/>
-                    <MenuItem Header="Edit description…" Click="DescriptionMenu_Click"/>
-                    <MenuItem Header="Add/edit tags…" Click="TagsMenu_Click"/>
+                    <MenuItem Header="Edit description…" Tag="Annotation" Click="DescriptionMenu_Click"/>
+                    <MenuItem Header="Add/edit tags…" Tag="Annotation" Click="TagsMenu_Click"/>
                     <Separator/>
                     <MenuItem Header="Open recording folder" Click="OpenFolderMenu_Click"/>
                 </ContextMenu>
@@ -630,7 +630,7 @@
                                            Foreground="#98A2B3"
                                            FontSize="12"
                                            Margin="0,5,0,0"/>
-                                <TextBlock Text="{Binding TagDisplay}"
+                                <TextBlock Text="{Binding AnnotationTagDisplay}"
                                            Foreground="#66C0F4"
                                            FontSize="12"
                                            Margin="0,4,0,0"
@@ -641,13 +641,13 @@
                 </DataTemplate>
             </ListView.ItemTemplate>
             <ListView.ContextMenu>
-                <ContextMenu>
+                <ContextMenu Opened="RecordingContextMenu_Opened">
                     <MenuItem Header="Play" Click="PlayMenu_Click"/>
                     <MenuItem Header="Export to MP4…" Click="ExportMenu_Click"/>
                     <Separator/>
                     <MenuItem Header="Toggle favorite" Click="FavoriteMenu_Click"/>
-                    <MenuItem Header="Edit description…" Click="DescriptionMenu_Click"/>
-                    <MenuItem Header="Add/edit tags…" Click="TagsMenu_Click"/>
+                    <MenuItem Header="Edit description…" Tag="Annotation" Click="DescriptionMenu_Click"/>
+                    <MenuItem Header="Add/edit tags…" Tag="Annotation" Click="TagsMenu_Click"/>
                     <Separator/>
                     <MenuItem Header="Open recording folder" Click="OpenFolderMenu_Click"/>
                 </ContextMenu>
@@ -895,12 +895,12 @@
                                         ElementStyle="{StaticResource TableText}"/>
                     <DataGridTextColumn Header="Sessions" Binding="{Binding SessionCount}" SortMemberPath="SessionCount" Width="96"
                                         ElementStyle="{StaticResource TableNumericText}"/>
-                    <DataGridTextColumn Header="Tags" Binding="{Binding TagsText}" SortMemberPath="TagsText" Width="190"
+                    <DataGridTextColumn Header="Tags" Binding="{Binding AnnotationTagsText}" SortMemberPath="AnnotationTagsText" Width="190"
                                         ElementStyle="{StaticResource TableText}"/>
-                    <DataGridTextColumn Header="Description" Binding="{Binding Description}" SortMemberPath="Description" Width="250">
+                    <DataGridTextColumn Header="Description" Binding="{Binding AnnotationDescription}" SortMemberPath="AnnotationDescription" Width="250">
                         <DataGridTextColumn.ElementStyle>
                             <Style TargetType="TextBlock" BasedOn="{StaticResource TableText}">
-                                <Setter Property="ToolTip" Value="{Binding Description}"/>
+                                <Setter Property="ToolTip" Value="{Binding AnnotationDescription}"/>
                             </Style>
                         </DataGridTextColumn.ElementStyle>
                     </DataGridTextColumn>
@@ -921,13 +921,13 @@
                     </DataGridTextColumn>
                 </DataGrid.Columns>
                 <DataGrid.ContextMenu>
-                    <ContextMenu>
+                    <ContextMenu Opened="RecordingContextMenu_Opened">
                         <MenuItem Header="Play" Click="PlayMenu_Click"/>
                         <MenuItem Header="Export to MP4…" Click="ExportMenu_Click"/>
                         <Separator/>
                         <MenuItem Header="Toggle favorite" Click="FavoriteMenu_Click"/>
-                        <MenuItem Header="Edit description…" Click="DescriptionMenu_Click"/>
-                        <MenuItem Header="Add/edit tags…" Click="TagsMenu_Click"/>
+                        <MenuItem Header="Edit description…" Tag="Annotation" Click="DescriptionMenu_Click"/>
+                        <MenuItem Header="Add/edit tags…" Tag="Annotation" Click="TagsMenu_Click"/>
                         <Separator/>
                         <MenuItem Header="Open recording folder" Click="OpenFolderMenu_Click"/>
                     </ContextMenu>

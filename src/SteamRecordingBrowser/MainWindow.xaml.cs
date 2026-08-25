@@ -343,7 +343,8 @@ public partial class MainWindow : Window
             query = query.Where(x => x.GameId.Equals(_selectedGameId, StringComparison.OrdinalIgnoreCase));
 
         if (!string.IsNullOrWhiteSpace(_selectedTag))
-            query = query.Where(x => x.Tags.Any(t => t.Equals(_selectedTag, StringComparison.OrdinalIgnoreCase)));
+            query = query.Where(x => x.SupportsAnnotations &&
+                                     x.Tags.Any(t => t.Equals(_selectedTag, StringComparison.OrdinalIgnoreCase)));
 
         if (FavoritesOnly.IsChecked == true)
             query = query.Where(x => x.IsFavorite);
@@ -356,9 +357,10 @@ public partial class MainWindow : Window
             var captured = term;
             query = query.Where(x =>
                 x.GameName.Contains(captured, StringComparison.OrdinalIgnoreCase) ||
-                x.Description.Contains(captured, StringComparison.OrdinalIgnoreCase) ||
                 x.RecordingTypeLabel.Contains(captured, StringComparison.OrdinalIgnoreCase) ||
-                x.Tags.Any(t => t.Contains(captured, StringComparison.OrdinalIgnoreCase)));
+                x.SupportsAnnotations &&
+                (x.Description.Contains(captured, StringComparison.OrdinalIgnoreCase) ||
+                 x.Tags.Any(t => t.Contains(captured, StringComparison.OrdinalIgnoreCase))));
         }
 
         var useTableFilters = TableLayoutPanel.Visibility == Visibility.Visible;
@@ -374,8 +376,9 @@ public partial class MainWindow : Window
             query = query.Where(x => x.VideoCodec.Contains(tableCodec, StringComparison.OrdinalIgnoreCase) ||
                                      x.AudioCodec.Contains(tableCodec, StringComparison.OrdinalIgnoreCase));
         if (tableMetadata.Length > 0)
-            query = query.Where(x => x.Description.Contains(tableMetadata, StringComparison.OrdinalIgnoreCase) ||
-                                     x.Tags.Any(tag => tag.Contains(tableMetadata, StringComparison.OrdinalIgnoreCase)) ||
+            query = query.Where(x => x.SupportsAnnotations &&
+                                     (x.Description.Contains(tableMetadata, StringComparison.OrdinalIgnoreCase) ||
+                                      x.Tags.Any(tag => tag.Contains(tableMetadata, StringComparison.OrdinalIgnoreCase))) ||
                                      x.SteamMetadata.Any(value => value.Contains(tableMetadata, StringComparison.OrdinalIgnoreCase)));
 
         query = _sortMode switch
@@ -412,6 +415,7 @@ public partial class MainWindow : Window
     {
         var previous = _selectedTag;
         var tags = _allItems
+            .Where(x => x.SupportsAnnotations)
             .SelectMany(x => x.Tags)
             .Distinct(StringComparer.OrdinalIgnoreCase)
             .OrderBy(x => x, StringComparer.CurrentCultureIgnoreCase)
@@ -847,10 +851,26 @@ public partial class MainWindow : Window
         e.Handled = true;
     }
 
+    private void RecordingContextMenu_Opened(object sender, RoutedEventArgs e)
+    {
+        if (sender is not ContextMenu contextMenu)
+            return;
+
+        var visibility = SelectedItem?.SupportsAnnotations == true
+            ? Visibility.Visible
+            : Visibility.Collapsed;
+        foreach (var menuItem in contextMenu.Items
+                     .OfType<MenuItem>()
+                     .Where(item => Equals(item.Tag, "Annotation")))
+        {
+            menuItem.Visibility = visibility;
+        }
+    }
+
     private void DescriptionMenu_Click(object sender, RoutedEventArgs e)
     {
         var item = SelectedItem;
-        if (item is null) return;
+        if (item?.SupportsAnnotations != true) return;
 
         var dialog = new TextEntryDialog("Edit description", "Description:", item.Description) { Owner = this };
         if (dialog.ShowDialog() != true) return;
@@ -863,7 +883,7 @@ public partial class MainWindow : Window
     private void TagsMenu_Click(object sender, RoutedEventArgs e)
     {
         var item = SelectedItem;
-        if (item is null) return;
+        if (item?.SupportsAnnotations != true) return;
 
         var dialog = new TextEntryDialog(
             "Edit tags",

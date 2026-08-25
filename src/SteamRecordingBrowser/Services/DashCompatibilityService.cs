@@ -424,20 +424,11 @@ public sealed class DashCompatibilityService
         var ns = root.Name.Namespace;
         root.Elements(ns + "Period").Remove();
 
-        var durations = sourceMpds.Select(GetDurationSeconds).ToArray();
-        var totalDuration = durations.Sum();
+        var durations = GetCombinedSessionDurationsSeconds(sourceMpds, staticSnapshot).ToArray();
         var activeIndex = Array.FindLastIndex(sourceMpds.ToArray(), LiveRecordingService.IsActivelyRecording);
         var anyActive = activeIndex >= 0;
         var emitDynamic = anyActive && !staticSnapshot;
-        if (staticSnapshot && activeIndex >= 0)
-        {
-            // Steam may still be writing the newest three-second fragment.
-            // Keep it outside the finite snapshot so every advertised point
-            // on libVLC's timeline maps to a complete segment.
-            durations[activeIndex] = Math.Max(0,
-                durations[activeIndex] - GrowingSnapshotTailMarginSeconds);
-            totalDuration = durations.Sum();
-        }
+        var totalDuration = durations.Sum();
         var start = 0d;
 
         for (var index = 0; index < sessionDocuments.Length; index++)
@@ -497,6 +488,192 @@ public sealed class DashCompatibilityService
 
         using var writer = new Utf8StringWriter();
         new XDocument(root).Save(writer, SaveOptions.DisableFormatting);
+        return writer.ToString();
+    }
+
+    public double GetCombinedDurationSeconds(IReadOnlyList<string> sourceMpds, bool staticSnapshot = false)
+    {
+        return GetCombinedSessionDurationsSeconds(sourceMpds, staticSnapshot).Sum();
+    }
+
+    public IReadOnlyList<double> GetCombinedSessionDurationsSeconds(
+        IReadOnlyList<string> sourceMpds,
+        bool staticSnapshot = false)
+    {
+        if (sourceMpds.Count == 0)
+            return [];
+
+        if (!staticSnapshot)
+            return sourceMpds.Select(GetDurationSeconds).ToArray();
+
+        return sourceMpds.Select(GetSnapshotDurationSeconds).ToArray();
+    }
+
+    public double GetSnapshotDurationSeconds(string sourceMpd)
+    {
+        var duration = Math.Max(0, GetDurationSeconds(sourceMpd) - GetSnapshotTrimOffsetSeconds(sourceMpd));
+        if (LiveRecordingService.IsActivelyRecording(sourceMpd))
+            duration = Math.Max(0, duration - GrowingSnapshotTailMarginSeconds);
+        return duration;
+    }
+
+    public double GetSnapshotClockOffsetSeconds(string sourceMpd)
+    {
+        try
+        {
+            var root = XDocument.Load(sourceMpd).Root;
+            if (root is null)
+                return GetSnapshotStartOffsetSeconds(sourceMpd);
+
+            var ns = root.Name.Namespace;
+            var periodStart = ParseIsoDuration(root.Elements(ns + "Period").FirstOrDefault()
+                ?.Attribute("start")?.Value);
+            return Math.Max(0, periodStart + GetSnapshotStartOffsetSeconds(sourceMpd));
+        }
+        catch (Exception ex)
+        {
+            AppLogger.Write($"Could not determine DASH wall-clock offset for {sourceMpd}: {ex.Message}", "WARN");
+            return GetSnapshotStartOffsetSeconds(sourceMpd);
+        }
+    }
+
+    public double GetSnapshotStartOffsetSeconds(string sourceMpd)
+    {
+        return GetSnapshotSegmentOffsets(sourceMpd).ClockShiftSeconds;
+    }
+
+    private double GetSnapshotTrimOffsetSeconds(string sourceMpd)
+    {
+        return GetSnapshotSegmentOffsets(sourceMpd).DurationTrimSeconds;
+    }
+
+    private (double ClockShiftSeconds, double DurationTrimSeconds) GetSnapshotSegmentOffsets(string sourceMpd)
+    {
+        try
+        {
+            var root = XDocument.Load(sourceMpd).Root;
+            if (root is null)
+                return (0, 0);
+
+            var ns = root.Name.Namespace;
+            var representations = root.Descendants(ns + "Representation").ToArray();
+            var candidates = new List<(XElement Representation, XElement Template, long Declared, long Available)>();
+            foreach (var representation in representations)
+            {
+                var template = representation.Element(ns + "SegmentTemplate")
+                    ?? representation.Parent?.Element(ns + "SegmentTemplate");
+                if (template is null) continue;
+
+                var declaredStart = ReadLong(template.Attribute("startNumber")?.Value, 1);
+                var availableStart = ResolveFirstSegmentPath(
+                    System.IO.Path.GetDirectoryName(sourceMpd)!,
+                    template.Attribute("media")?.Value,
+                    representation.Attribute("id")?.Value ?? "",
+                    declaredStart) is not null
+                    ? declaredStart
+                    : FindFirstAvailableSegmentNumber(
+                        System.IO.Path.GetDirectoryName(sourceMpd)!,
+                        template.Attribute("media")?.Value,
+                        representation.Attribute("id")?.Value ?? "",
+                        declaredStart);
+                if (availableStart.HasValue)
+                    candidates.Add((representation, template, declaredStart, availableStart.Value));
+            }
+
+            if (candidates.Count == 0)
+                return (0, 0);
+
+            var commonAvailableStart = candidates.Max(candidate => candidate.Available);
+            var alignedStart = commonAvailableStart;
+            if (LiveRecordingService.IsActivelyRecording(sourceMpd))
+            {
+                const long rollingPruneSafetySegments = 20;
+                var safeStart = alignedStart + rollingPruneSafetySegments;
+                var allHaveSafeStart = representations.All(representation =>
+                {
+                    var template = representation.Element(ns + "SegmentTemplate")
+                        ?? representation.Parent?.Element(ns + "SegmentTemplate");
+                    return template is null || ResolveFirstSegmentPath(
+                        System.IO.Path.GetDirectoryName(sourceMpd)!,
+                        template.Attribute("media")?.Value,
+                        representation.Attribute("id")?.Value ?? "",
+                        safeStart) is not null;
+                });
+                if (allHaveSafeStart)
+                    alignedStart = safeStart;
+            }
+
+            var clockShiftSeconds = 0d;
+            foreach (var candidate in candidates)
+            {
+                var duration = ReadLong(candidate.Template.Attribute("duration")?.Value, 0);
+                var timescale = ReadLong(candidate.Template.Attribute("timescale")?.Value, 1);
+                if (duration > 0 && timescale > 0)
+                {
+                    clockShiftSeconds = Math.Max(
+                        clockShiftSeconds,
+                        Math.Max(0, alignedStart - candidate.Declared) * duration / (double)timescale);
+                }
+            }
+
+            var videoCandidate = candidates.FirstOrDefault(candidate =>
+                string.Equals(candidate.Representation.Parent?.Attribute("contentType")?.Value,
+                    "video", StringComparison.OrdinalIgnoreCase));
+            var durationBaseline = LiveRecordingService.IsActivelyRecording(sourceMpd)
+                ? videoCandidate.Representation is not null
+                    ? videoCandidate.Available
+                    : commonAvailableStart
+                : videoCandidate.Representation is not null
+                    ? videoCandidate.Declared
+                    : candidates.Min(candidate => candidate.Declared);
+            var baselineTemplate = videoCandidate.Template ?? candidates[0].Template;
+            var baselineDuration = ReadLong(baselineTemplate.Attribute("duration")?.Value, 0);
+            var baselineTimescale = ReadLong(baselineTemplate.Attribute("timescale")?.Value, 1);
+            var durationTrimSeconds = baselineDuration > 0 && baselineTimescale > 0
+                ? Math.Max(0, alignedStart - durationBaseline) * baselineDuration / (double)baselineTimescale
+                : 0;
+
+            return (clockShiftSeconds, durationTrimSeconds);
+        }
+        catch (Exception ex)
+        {
+            AppLogger.Write($"Could not determine retained DASH start offset for {sourceMpd}: {ex.Message}", "WARN");
+            return (0, 0);
+        }
+    }
+
+    public string CreateBridgedSnapshotManifest(string sourceMpd, int routeIndex)
+    {
+        var doc = XDocument.Parse(CreateLiveManifest(sourceMpd));
+        var root = doc.Root ?? throw new InvalidDataException("MPD has no root element.");
+        var ns = root.Name.Namespace;
+        var period = root.Elements(ns + "Period").FirstOrDefault()
+                     ?? throw new InvalidDataException("MPD has no Period element.");
+        var durationSeconds = GetSnapshotDurationSeconds(sourceMpd);
+        var duration = System.Xml.XmlConvert.ToString(TimeSpan.FromSeconds(durationSeconds));
+
+        root.SetAttributeValue("type", "static");
+        root.SetAttributeValue("mediaPresentationDuration", duration);
+        root.Attribute("minimumUpdatePeriod")?.Remove();
+        root.Attribute("suggestedPresentationDelay")?.Remove();
+        root.Attribute("publishTime")?.Remove();
+        root.Attribute("availabilityStartTime")?.Remove();
+        root.Attribute("timeShiftBufferDepth")?.Remove();
+        period.SetAttributeValue("start", "PT0S");
+        period.SetAttributeValue("duration", duration);
+
+        foreach (var template in period.Descendants(ns + "SegmentTemplate"))
+        {
+            foreach (var attributeName in new[] { "initialization", "media" })
+            {
+                var attribute = template.Attribute(attributeName);
+                if (attribute is not null)
+                    attribute.Value = $"/s{routeIndex}/{attribute.Value.TrimStart('/')}";
+            }
+        }
+
+        using var writer = new Utf8StringWriter();
+        doc.Save(writer, SaveOptions.DisableFormatting);
         return writer.ToString();
     }
 

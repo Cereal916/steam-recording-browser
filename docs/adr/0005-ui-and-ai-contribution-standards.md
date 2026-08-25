@@ -158,7 +158,7 @@ Examples:
 ```text
 feat(player): improve long-video navigation
 
-- add fine scrubbing and exact timestamp seeking
+- add fine scrubbing and hover frame previews
 - add duration-aware timeline markers and seek controls
 - reduce DASH seek pressure for recordings longer than one hour
 ```

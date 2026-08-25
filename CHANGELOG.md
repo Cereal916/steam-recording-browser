@@ -9,6 +9,24 @@ The project follows semantic versioning beginning with **1.0.0**.
 
 ## Unreleased
 
+### Changed
+
+- Multi-session auto recordings now use a rolling wall-clock timeline with
+  gameplay session markers that remains accurate as Steam updates its window.
+- Simplified the player timeline by replacing the timestamp editor with a
+  dedicated counter, responsive and collision-free markers, and full
+  date-and-time hover previews for every recording.
+- Limited descriptions and tags to saved clips so temporary live and automatic
+  recordings no longer expose annotation controls or annotation-based filters.
+
+### Fixed
+
+- Fixed playback and hover previews freezing when navigating between gameplay
+  sessions, including after an auto recording has ended, or seeking backward
+  from the live edge.
+- Timeline selections now automatically resume playback from the chosen
+  position after a recording finishes.
+
 ## 1.5.0 - 2026-08-24
 
 ### Added

@@ -16,9 +16,65 @@ public sealed class LiveDashServer : IDisposable
     private readonly Task _serverTask;
     private long _segmentRequestCount;
     private long _liveManifestRequestCount;
+    private long _snapshotGeneration;
+    private long _sessionSnapshotGeneration;
 
     public Uri ManifestUri { get; }
     public Uri LiveManifestUri { get; }
+
+    public Uri CreateSnapshotUri()
+    {
+        var generation = Interlocked.Increment(ref _snapshotGeneration);
+        var builder = new UriBuilder(ManifestUri)
+        {
+            Query = $"generation={generation.ToString(CultureInfo.InvariantCulture)}"
+        };
+        return builder.Uri;
+    }
+
+    public long GetSnapshotDurationMilliseconds()
+    {
+        var seconds = _dash.GetCombinedDurationSeconds(_manifestPaths, staticSnapshot: true);
+        return (long)Math.Round(Math.Max(0, seconds) * 1000d);
+    }
+
+    public LiveSnapshotTimeline GetSnapshotTimeline()
+    {
+        var durations = _dash.GetCombinedSessionDurationsSeconds(_manifestPaths, staticSnapshot: true);
+        var activeIndex = Array.FindLastIndex(_manifestPaths, LiveRecordingService.IsActivelyRecording);
+        if (activeIndex < 0)
+            activeIndex = Math.Max(0, durations.Count - 1);
+
+        var sessions = new List<LiveSnapshotSession>(durations.Count);
+        var offsetSeconds = 0d;
+        for (var index = 0; index < durations.Count; index++)
+        {
+            sessions.Add(new LiveSnapshotSession(
+                index,
+                (long)Math.Round(offsetSeconds * 1000d),
+                (long)Math.Round(Math.Max(0, durations[index]) * 1000d),
+                (long)Math.Round(Math.Max(0, _dash.GetSnapshotClockOffsetSeconds(_manifestPaths[index])) * 1000d)));
+            offsetSeconds += durations[index];
+        }
+
+        var activeOffsetSeconds = durations.Take(activeIndex).Sum();
+        var activeDurationSeconds = activeIndex < durations.Count ? durations[activeIndex] : 0;
+        return new LiveSnapshotTimeline(
+            (long)Math.Round(activeOffsetSeconds * 1000d),
+            (long)Math.Round(Math.Max(0, activeDurationSeconds) * 1000d),
+            (long)Math.Round(Math.Max(0, durations.Sum()) * 1000d),
+            sessions);
+    }
+
+    public Uri CreateSessionSnapshotUri(int sessionIndex)
+    {
+        if (sessionIndex < 0 || sessionIndex >= _manifestPaths.Length)
+            throw new ArgumentOutOfRangeException(nameof(sessionIndex));
+        var generation = Interlocked.Increment(ref _sessionSnapshotGeneration);
+        return new Uri(
+            $"{ManifestUri.GetLeftPart(UriPartial.Authority)}/session/{sessionIndex.ToString(CultureInfo.InvariantCulture)}.mpd" +
+            $"?generation={generation.ToString(CultureInfo.InvariantCulture)}");
+    }
 
     public LiveDashServer(DashCompatibilityService dash, IReadOnlyList<string> manifestPaths)
     {
@@ -110,6 +166,26 @@ public sealed class LiveDashServer : IDisposable
                         AppLogger.Write(
                             $"Dynamic DASH manifest served. request={manifestRequest} session={activeIndex} " +
                             $"bytes={bytes.Length} source={_manifestPaths[activeIndex]}", "DEBUG");
+                    await WriteBytesAsync(stream, bytes, "application/dash+xml", parts[0] == "HEAD", cancellationToken)
+                        .ConfigureAwait(false);
+                    return;
+                }
+
+                var sessionManifestParts = requestPath.Split('/', StringSplitOptions.RemoveEmptyEntries);
+                if (sessionManifestParts.Length == 2 &&
+                    sessionManifestParts[0].Equals("session", StringComparison.OrdinalIgnoreCase) &&
+                    sessionManifestParts[1].EndsWith(".mpd", StringComparison.OrdinalIgnoreCase) &&
+                    int.TryParse(sessionManifestParts[1][..^4], NumberStyles.None,
+                        CultureInfo.InvariantCulture, out var snapshotSessionIndex) &&
+                    snapshotSessionIndex >= 0 && snapshotSessionIndex < _manifestPaths.Length)
+                {
+                    var manifest = _dash.CreateBridgedSnapshotManifest(
+                        _manifestPaths[snapshotSessionIndex], snapshotSessionIndex);
+                    var bytes = Encoding.UTF8.GetBytes(manifest);
+                    AppLogger.Write(
+                        $"Single-session DASH snapshot served. session={snapshotSessionIndex} " +
+                        $"bytes={bytes.Length} source={_manifestPaths[snapshotSessionIndex]}",
+                        "DEBUG");
                     await WriteBytesAsync(stream, bytes, "application/dash+xml", parts[0] == "HEAD", cancellationToken)
                         .ConfigureAwait(false);
                     return;
@@ -247,3 +323,15 @@ public sealed class LiveDashServer : IDisposable
         AppLogger.Write($"DASH bridge stopped for {_manifestPaths.Length} session(s).");
     }
 }
+
+public sealed record LiveSnapshotTimeline(
+    long ActiveSessionOffsetMilliseconds,
+    long ActiveSessionDurationMilliseconds,
+    long TotalDurationMilliseconds,
+    IReadOnlyList<LiveSnapshotSession> Sessions);
+
+public readonly record struct LiveSnapshotSession(
+    int Index,
+    long OffsetMilliseconds,
+    long DurationMilliseconds,
+    long ClockStartOffsetMilliseconds);

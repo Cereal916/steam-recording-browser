@@ -15,6 +15,7 @@ public sealed class RecordingItem : INotifyPropertyChanged
     public required string GameId { get; init; }
     public required string GameName { get; init; }
     public required DateTime Timestamp { get; init; }
+    public DateTime PlaybackStartTime { get; init; }
     public required long SizeBytes { get; init; }
     public required double DurationSeconds { get; init; }
     public string? ThumbnailPath { get; init; }
@@ -42,11 +43,16 @@ public sealed class RecordingItem : INotifyPropertyChanged
             OnPropertyChanged();
             OnPropertyChanged(nameof(RecordingTypeLabel));
             OnPropertyChanged(nameof(VideoInfoText));
+            OnPropertyChanged(nameof(SupportsAnnotations));
+            OnPropertyChanged(nameof(AnnotationDescription));
+            OnPropertyChanged(nameof(AnnotationTagDisplay));
+            OnPropertyChanged(nameof(AnnotationTagsText));
         }
     }
 
     public string RecordingTypeLabel => IsLive ? "LIVE • AUTO RECORDING" :
         IsAutoRecording ? "AUTO RECORDING" : "SAVED CLIP";
+    public bool SupportsAnnotations => IsSavedClip && !IsLive;
 
     public string DisplayTime => Timestamp.ToString("MMM d, yyyy  h:mm:ss tt");
     public string DurationText => DurationSeconds > 0 ? FormatDuration(DurationSeconds) : "—";
@@ -101,7 +107,13 @@ public sealed class RecordingItem : INotifyPropertyChanged
     public string Description
     {
         get => _description;
-        set { if (_description != value) { _description = value ?? ""; OnPropertyChanged(); } }
+        set
+        {
+            if (_description == value) return;
+            _description = value ?? "";
+            OnPropertyChanged();
+            OnPropertyChanged(nameof(AnnotationDescription));
+        }
     }
 
     public IReadOnlyList<string> Tags
@@ -112,11 +124,16 @@ public sealed class RecordingItem : INotifyPropertyChanged
             _tags = value ?? Array.Empty<string>();
             OnPropertyChanged();
             OnPropertyChanged(nameof(TagDisplay));
+            OnPropertyChanged(nameof(AnnotationTagDisplay));
+            OnPropertyChanged(nameof(AnnotationTagsText));
         }
     }
 
     public string TagDisplay => Tags.Count > 0 ? "Tags: " + string.Join(", ", Tags) : "";
     public string TagsText => string.Join(", ", Tags);
+    public string AnnotationDescription => SupportsAnnotations ? Description : "";
+    public string AnnotationTagDisplay => SupportsAnnotations ? TagDisplay : "";
+    public string AnnotationTagsText => SupportsAnnotations ? TagsText : "";
 
     public event PropertyChangedEventHandler? PropertyChanged;
 
