@@ -12,6 +12,9 @@ readability.
 
 The project is also developed with AI assistance. Code changes need a concise,
 ready-to-use commit message so they can be reviewed and committed consistently.
+Release preparation also needs a consistent definition so version numbers,
+artifacts, changelogs, and public release notes describe the same set of
+user-visible changes.
 
 ## Decision
 
@@ -61,10 +64,68 @@ ready-to-use commit message so they can be reviewed and committed consistently.
 - UI layout verification must include long or wrapping copy, non-maximized
   windows, and display scaling. A feature is not complete if text overlaps,
   clips, or is obscured by padding at any supported minimum window size.
-- After making any source-code change, an AI assistant must end its final
-  response with a concise commit message that accurately summarizes the change.
+- After making any source-code change, an AI assistant must inspect the complete
+  Git working tree—including staged, unstaged, and untracked files—and end its
+  final response with a concise commit message that accurately summarizes all
+  uncommitted changes, not only the work performed for the latest request.
+- The recommended message must describe the net diff between `HEAD` and the
+  entire current working tree. Consolidate iterative edits into their final
+  outcomes and include every meaningful feature, fix, refactor, documentation,
+  build, test, or migration change that would be included by committing the
+  working tree at that moment.
+- If repository status cannot be inspected, the assistant must say so and must
+  not present a latest-request-only message as if it covers the full diff.
 - The commit message must be the final line of the response and use the format
   `Commit message: <message>`.
+
+### Release-preparation workflow
+
+When the maintainer asks an AI assistant to **prepare for a release**, the
+assistant must complete all of the following work rather than treating the
+request as only a version bump:
+
+1. Compare the current unreleased changes with the most recent published
+   release. Determine the next version using semantic versioning:
+   - increment the patch version when the release contains only backward-
+     compatible bug fixes, performance improvements, documentation, or
+     maintenance changes;
+   - increment the minor version when it adds any backward-compatible user-
+     visible feature or capability, even if fixes are included as well;
+   - increment the major version when it contains a breaking change to public
+     behavior, persisted data, compatibility, or supported workflows.
+2. Update the centralized version in `Directory.Build.props`. Do not introduce
+   hard-coded duplicate version strings.
+3. Move the relevant `CHANGELOG.md` entries from **Unreleased** into a dated
+   section for the new version. Every changelog section must describe only the
+   net differences from the preceding public release, grouped appropriately as
+   additions, improvements or changes, fixes, refactors, and other meaningful
+   release-level outcomes. Consolidate related work into its final result and
+   exclude intermediate fixes, temporary regressions, abandoned approaches,
+   repeated rewrites, and internal iteration or build-number history.
+4. Run `Build Release.cmd` from the repository root and report whether release
+   packaging succeeded. A release is not prepared successfully if this command
+   fails; diagnose and fix in-scope failures before presenting it as ready.
+5. Provide release notes in Markdown format. The notes must describe the net
+   difference from the previous published release. Do not mention intermediate
+   fixes, regressions, redesign attempts, or other incremental work that only
+   occurred while developing a feature for this same release. Describe the
+   final feature or fix once, from the user's perspective.
+6. Include a clickable link to the repository's GitHub release page. Before a
+   release exists, use the version-specific creation page
+   `https://github.com/Cereal916/steam-recording-browser/releases/new?tag=v<version>`;
+   for an existing release, use
+   `https://github.com/Cereal916/steam-recording-browser/releases/tag/v<version>`.
+
+Release notes should be concise, grouped under useful headings such as
+`Highlights`, `Added`, `Improved`, and `Fixed`, and must not include internal
+implementation details unless users need them to understand compatibility,
+migration, or operational requirements.
+
+The same editorial standard applies to `CHANGELOG.md`, including historical
+cleanup: it is a public release history, not an engineering diary. Refactors
+belong in the changelog when they materially affect maintainability,
+architecture, packaging, compatibility, or contributor workflows; trivial code
+rearrangement does not.
 
 ### Commit-message format
 
@@ -107,4 +168,6 @@ feat(player): improve long-video navigation
 New interfaces remain visually consistent with the rest of the application,
 including less frequently used dialogs and interaction states. AI-assisted
 changes also arrive with a predictable commit-message handoff, reducing effort
-when reviewing and committing completed work.
+when reviewing and committing completed work. Release preparation produces a
+semantically correct version, verified release artifacts, a consolidated
+changelog, user-focused Markdown notes, and a direct GitHub release handoff.
