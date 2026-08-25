@@ -9,6 +9,8 @@ The project follows semantic versioning beginning with **1.0.0**.
 
 ## Unreleased
 
+## 1.5.0 - 2026-08-24
+
 ### Added
 
 - Added a compact table layout with sortable, resizable, reorderable, and
