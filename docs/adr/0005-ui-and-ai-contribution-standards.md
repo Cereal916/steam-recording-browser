@@ -75,8 +75,10 @@ user-visible changes.
   working tree at that moment.
 - If repository status cannot be inspected, the assistant must say so and must
   not present a latest-request-only message as if it covers the full diff.
-- The commit message must be the final line of the response and use the format
-  `Commit message: <message>`.
+- The commit-message handoff must be the final content in the response. Put
+  `Commit message:` on its own line and place the complete recommendation in a
+  fenced `text` code block immediately after it so the application presents a
+  click-to-copy control.
 
 ### Release-preparation workflow
 
@@ -147,14 +149,18 @@ Commit messages must follow these conventions:
 - Keep body entries focused on important behavior, compatibility, migration,
   security, or verification details. Do not repeat the subject or enumerate
   trivial implementation steps.
-- For a multi-line recommendation, the final response must use a fenced text
-  block immediately after `Commit message:` so the complete message can be
-  copied without reformatting.
+- Every recommendation, including a single-line subject, must use a fenced
+  `text` block immediately after `Commit message:` so it can be copied without
+  reformatting.
 
 Examples:
 
-`fix(player): restore startup audio and preserve volume state`
+Commit message:
+```text
+fix(player): restore startup audio and preserve volume state
+```
 
+Commit message:
 ```text
 feat(player): improve long-video navigation
 
