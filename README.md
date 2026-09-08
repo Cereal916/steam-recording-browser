@@ -38,7 +38,7 @@ folder containing your Steam recording sessions.
 - Integrated WPF/libVLC playback
 - Steam DASH compatibility manifest generation without modifying originals
 - Timeline seeking and frame preview
-- Clickable Steam Timeline events, ranges, and game-suggested clips
+- Clickable, type-filterable Steam Timeline events, ranges, and game-suggested clips
 - MP4 remux export through bundled libVLC
 - H.264, HEVC, and AV1 transcoding through bundled FFmpeg
 - Automatic NVENC, Quick Sync, and AMF encoding with software fallback

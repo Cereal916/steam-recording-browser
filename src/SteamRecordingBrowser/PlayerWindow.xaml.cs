@@ -123,6 +123,7 @@ private readonly DispatcherTimer _hoverFramePauseTimer;
 
     private long _timelineTicksLength = -1;
     private double _timelineTicksWidth = -1;
+    private bool _timelineEventFilterReady;
 
     private const long LongVideoThresholdMs = 60 * 60 * 1000;
     private const long LongVideoPreviewSegmentMs = 3_000;
@@ -156,6 +157,16 @@ private readonly DispatcherTimer _hoverFramePauseTimer;
         _item = item;
         TimelineEventList.ItemsSource = item.TimelineEvents;
         TimelineEventCountText.Text = item.TimelineEvents.Count.ToString("N0", CultureInfo.CurrentCulture);
+        TimelineEventTypeFilter.ItemsSource = new[]
+            {
+                new TimelineEventFilterOption(null, "All event types")
+            }
+            .Concat(item.TimelineEvents
+                .GroupBy(timelineEvent => timelineEvent.Type, StringComparer.OrdinalIgnoreCase)
+                .Select(group => new TimelineEventFilterOption(group.Key, group.First().TypeLabel))
+                .OrderBy(option => option.Label, StringComparer.CurrentCultureIgnoreCase))
+            .ToArray();
+        TimelineEventTypeFilter.SelectedIndex = 0;
         TimelineEventBrowser.Visibility = item.TimelineEvents.Count > 0
             ? Visibility.Visible
             : Visibility.Collapsed;
@@ -321,6 +332,8 @@ private readonly DispatcherTimer _hoverFramePauseTimer;
             _player.Dispose();
             _liveDashServer?.Dispose();
         };
+
+        _timelineEventFilterReady = true;
     }
 
     private void UpdateTimeline()
@@ -3321,7 +3334,7 @@ private readonly DispatcherTimer _hoverFramePauseTimer;
         if (_item.TimelineEvents.Count == 0 || lengthMs <= 0 || width <= 0)
             return;
 
-        foreach (var timelineEvent in _item.TimelineEvents
+        foreach (var timelineEvent in GetFilteredTimelineEvents()
                      .OrderBy(value => value.Priority)
                      .ThenBy(value => value.PositionSeconds))
         {
@@ -3365,6 +3378,34 @@ private readonly DispatcherTimer _hoverFramePauseTimer;
             Panel.SetZIndex(marker, Math.Max(0, timelineEvent.Priority));
             TimelineEventCanvas.Children.Add(marker);
         }
+    }
+
+    private void TimelineEventTypeFilter_SelectionChanged(object sender, SelectionChangedEventArgs e)
+    {
+        if (!_timelineEventFilterReady)
+            return;
+
+        var filteredEvents = GetFilteredTimelineEvents();
+        TimelineEventList.ItemsSource = filteredEvents;
+        TimelineEventCountText.Text = filteredEvents.Count == _item.TimelineEvents.Count
+            ? filteredEvents.Count.ToString("N0", CultureInfo.CurrentCulture)
+            : $"{filteredEvents.Count:N0} / {_item.TimelineEvents.Count:N0}";
+
+        _timelineTicksWidth = -1;
+        UpdateTimelineTicks(_usesLiveClockTimeline
+            ? Math.Max(0, _historyLengthMs)
+            : Math.Max(0, _player.Length));
+    }
+
+    private IReadOnlyList<SteamTimelineEvent> GetFilteredTimelineEvents()
+    {
+        var selectedType = (TimelineEventTypeFilter.SelectedItem as TimelineEventFilterOption)?.Type;
+        return string.IsNullOrWhiteSpace(selectedType)
+            ? _item.TimelineEvents
+            : _item.TimelineEvents
+                .Where(timelineEvent => timelineEvent.Type.Equals(
+                    selectedType, StringComparison.OrdinalIgnoreCase))
+                .ToArray();
     }
 
     private (long StartMilliseconds, long DurationMilliseconds)? MapTimelineEvent(
@@ -3424,6 +3465,8 @@ private readonly DispatcherTimer _hoverFramePauseTimer;
                 };
         return new SolidColorBrush(color);
     }
+
+    private sealed record TimelineEventFilterOption(string? Type, string Label);
 
     private void TimelineEvent_Click(object sender, RoutedEventArgs e)
     {
