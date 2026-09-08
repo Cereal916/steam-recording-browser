@@ -310,6 +310,8 @@
 
                     <StackPanel DockPanel.Dock="Right" Orientation="Horizontal" VerticalAlignment="Center">
                         <Button Style="{StaticResource ButtonStyle}" Content="Open log" Click="OpenLog_Click"/>
+                        <Button Style="{StaticResource ButtonStyle}" Content="Storage" Click="StorageDashboard_Click"
+                                ToolTip="See recording storage by game and estimate duplicated footage"/>
                         <Button Style="{StaticResource ButtonStyle}" Content="Settings" Click="Settings_Click"/>
                         <Button Style="{StaticResource ButtonStyle}" Content="Refresh" Click="Refresh_Click"/>
                     </StackPanel>

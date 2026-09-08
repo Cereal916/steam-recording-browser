@@ -96,6 +96,7 @@ public sealed class RecordingScanner
             LiveRecordingService.IsActivelyRecording(mpdPath))
             durationSeconds = LiveRecordingService.GetDynamicDurationSeconds(mpdPath);
         var technicalInfo = _dash.GetMediaTechnicalInfo(mpdPath);
+        var playbackStartTime = timestamp.AddSeconds(_dash.GetSnapshotClockOffsetSeconds(mpdPath));
 
         return new RecordingItem
         {
@@ -104,7 +105,7 @@ public sealed class RecordingScanner
             GameId = gameId,
             GameName = gameName,
             Timestamp = timestamp,
-            PlaybackStartTime = timestamp.AddSeconds(_dash.GetSnapshotClockOffsetSeconds(mpdPath)),
+            PlaybackStartTime = playbackStartTime,
             SizeBytes = size,
             DurationSeconds = durationSeconds,
             ThumbnailPath = FindSteamThumbnail(mpdPath),
@@ -115,6 +116,9 @@ public sealed class RecordingScanner
             SessionPaths = new[] { mpdPath },
             SessionStartOffsetsSeconds = new[] { 0d },
             SessionStartTimes = new[] { timestamp },
+            SessionPlaybackStartTimes = new[] { playbackStartTime },
+            SessionDurationsSeconds = new[] { durationSeconds },
+            SessionSizesBytes = new[] { size },
             VideoCodec = technicalInfo.VideoCodec,
             AudioCodec = technicalInfo.AudioCodec,
             Resolution = technicalInfo.Resolution,
@@ -194,6 +198,9 @@ public sealed class RecordingScanner
                 SessionPaths = sessions.Select(session => session.Path).ToArray(),
                 SessionStartOffsetsSeconds = offsets,
                 SessionStartTimes = sessions.Select(session => session.Timestamp).ToArray(),
+                SessionPlaybackStartTimes = sessions.Select(session => session.PlaybackStartTime).ToArray(),
+                SessionDurationsSeconds = sessions.Select(session => session.DurationSeconds).ToArray(),
+                SessionSizesBytes = sessions.Select(session => session.SizeBytes).ToArray(),
                 VideoCodec = primary.VideoCodec,
                 AudioCodec = primary.AudioCodec,
                 Resolution = primary.Resolution,

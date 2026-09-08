@@ -9,6 +9,12 @@ The project follows semantic versioning beginning with **1.0.0**.
 
 ## Unreleased
 
+### Added
+
+- Added a read-only storage dashboard with per-game usage, saved-clip and
+  rolling-recording totals, oldest-recording discovery, and overlapping-footage
+  analysis.
+
 ## 1.6.0 - 2026-09-08
 
 ### Added

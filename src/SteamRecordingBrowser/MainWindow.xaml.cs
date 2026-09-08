@@ -52,6 +52,7 @@ public partial class MainWindow : Window
     private string _recordingRoot = "";
     private bool _clipLayoutChangedFromSettings;
     private LogViewerWindow? _logViewer;
+    private StorageDashboardWindow? _storageDashboard;
     private DispatcherTimer? _searchFilterTimer;
     private DispatcherOperation? _dateTimelineUpdateOperation;
     private readonly ObservableCollection<TableColumnOption> _tableColumnOptions = new();
@@ -284,6 +285,7 @@ public partial class MainWindow : Window
 
             _allItems.Clear();
             _allItems.AddRange(items);
+            _storageDashboard?.UpdateRecordings(_allItems);
 
             if (isInitialLoad)
                 ReportStartup(94, "Building game and tag filters…");
@@ -850,6 +852,25 @@ public partial class MainWindow : Window
                 WpfMessageBoxButton.OK,
                 WpfMessageBoxImage.Error);
         }
+    }
+
+    private void StorageDashboard_Click(object sender, RoutedEventArgs e)
+    {
+        if (_storageDashboard is not null)
+        {
+            _storageDashboard.UpdateRecordings(_allItems);
+            if (_storageDashboard.WindowState == WindowState.Minimized)
+                _storageDashboard.WindowState = WindowState.Normal;
+            _storageDashboard.Activate();
+            return;
+        }
+
+        _storageDashboard = new StorageDashboardWindow(_allItems)
+        {
+            Owner = this
+        };
+        _storageDashboard.Closed += (_, _) => _storageDashboard = null;
+        _storageDashboard.Show();
     }
 
     private void ExportMenu_Click(object sender, RoutedEventArgs e) => ExportSelected();
