@@ -69,6 +69,24 @@ public sealed class RecordingItem : INotifyPropertyChanged
     public string SizeText => FormatBytes(SizeBytes);
     public int SessionCount => Math.Max(1, SessionPaths.Count);
     public string SteamMetadataDisplay => string.Join("; ", SteamMetadata);
+    public int AchievementCount => TimelineEvents.Count(IsAchievementEvent);
+    public bool HasAchievements => AchievementCount > 0;
+    public string AchievementCheckGlyph => HasAchievements ? "✓" : "";
+    public string AchievementIconText => HasAchievements ? $"🏆 {AchievementCount:N0}" : "";
+    public IReadOnlyList<string> AchievementNames => TimelineEvents
+        .Where(IsAchievementEvent)
+        .Select(timelineEvent => timelineEvent.Title.Trim())
+        .Where(title => title.Length > 0 &&
+                        !title.Equals("Achievement", StringComparison.OrdinalIgnoreCase))
+        .Distinct(StringComparer.OrdinalIgnoreCase)
+        .ToArray();
+    public string AchievementDisplayText => AchievementNames.Count > 0
+        ? string.Join(", ", AchievementNames)
+        : $"{AchievementCount:N0} achievement{(AchievementCount == 1 ? "" : "s")}";
+    public string AchievementToolTip => AchievementNames.Count > 0
+        ? "Achievements" + Environment.NewLine +
+          string.Join(Environment.NewLine, AchievementNames.Select(name => $"• {name}"))
+        : AchievementDisplayText;
     public string VideoInfoText
     {
         get
@@ -146,6 +164,9 @@ public sealed class RecordingItem : INotifyPropertyChanged
     public string AnnotationTagsText => SupportsAnnotations ? TagsText : "";
 
     public event PropertyChangedEventHandler? PropertyChanged;
+
+    private static bool IsAchievementEvent(SteamTimelineEvent timelineEvent) =>
+        timelineEvent.Type.Equals("achievement", StringComparison.OrdinalIgnoreCase);
 
     private void OnPropertyChanged([CallerMemberName] string? name = null) =>
         PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(name));

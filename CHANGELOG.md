@@ -11,6 +11,10 @@ The project follows semantic versioning beginning with **1.0.0**.
 
 ### Added
 
+- Added achievement badges, names, counts, and achievement-aware filtering to
+  the list, grid, and table clip views.
+- Achievement API identifiers are resolved to localized titles from Steam's
+  local stats schema when available.
 - Added clickable Steam Timeline event markers and a filterable event browser
   in the player for achievements, named game states, event ranges, screenshots,
   user markers, and game-suggested clips.

@@ -97,6 +97,7 @@ public sealed class RecordingScanner
             durationSeconds = LiveRecordingService.GetDynamicDurationSeconds(mpdPath);
         var technicalInfo = _dash.GetMediaTechnicalInfo(mpdPath);
         var playbackStartTime = timestamp.AddSeconds(_dash.GetSnapshotClockOffsetSeconds(mpdPath));
+        var achievementNames = _steam.GetAchievementNames(gameId);
 
         return new RecordingItem
         {
@@ -120,7 +121,7 @@ public sealed class RecordingScanner
             SessionDurationsSeconds = new[] { durationSeconds },
             SessionSizesBytes = new[] { size },
             TimelineEvents = SteamTimelineService.ReadForRecording(
-                mpdPath, gameId, playbackStartTime, durationSeconds),
+                mpdPath, gameId, playbackStartTime, durationSeconds, achievementNames),
             VideoCodec = technicalInfo.VideoCodec,
             AudioCodec = technicalInfo.AudioCodec,
             Resolution = technicalInfo.Resolution,

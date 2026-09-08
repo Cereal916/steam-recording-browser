@@ -48,6 +48,7 @@ public partial class MainWindow : Window
     private CancellationTokenSource? _scanCancellation;
     private string _selectedGameId = "";
     private string _selectedTag = "";
+    private string _selectedTimelineEventType = "";
     private string _sortMode = "Newest";
     private string _recordingRoot = "";
     private bool _clipLayoutChangedFromSettings;
@@ -57,6 +58,7 @@ public partial class MainWindow : Window
     private DispatcherOperation? _dateTimelineUpdateOperation;
     private readonly ObservableCollection<TableColumnOption> _tableColumnOptions = new();
     private bool _updatingTableColumns;
+    private bool _updatingTimelineEventFilter;
     private Point _columnDragStart;
     private TableColumnOption? _draggedTableColumn;
     private List<TableColumnOption>? _columnOrderBeforeDrag;
@@ -130,6 +132,7 @@ public partial class MainWindow : Window
 
         SortFilter.ItemsSource = new[] { "Newest", "Oldest", "Largest", "Smallest" };
         SortFilter.SelectedItem = "Newest";
+        UpdateTimelineEventTypeFilter();
 
         ReportStartup(35, "Loading recording settings…");
         InitializeRecordingRoot();
@@ -292,6 +295,7 @@ public partial class MainWindow : Window
 
             UpdateGameFilter();
             UpdateTagFilter();
+            UpdateTimelineEventTypeFilter();
 
             if (isInitialLoad)
                 ReportStartup(97, "Preparing clip browser…");
@@ -351,6 +355,13 @@ public partial class MainWindow : Window
         if (FavoritesOnly.IsChecked == true)
             query = query.Where(x => x.IsFavorite);
 
+        var useTableFilters = TableLayoutPanel.Visibility == Visibility.Visible;
+        if (!useTableFilters && !string.IsNullOrWhiteSpace(_selectedTimelineEventType))
+            query = query.Where(item => item.TimelineEvents.Any(timelineEvent =>
+                timelineEvent.Type.Equals(_selectedTimelineEventType, StringComparison.OrdinalIgnoreCase)));
+        if (useTableFilters && TableAchievementFilter.IsChecked == true)
+            query = query.Where(item => item.HasAchievements);
+
         var terms = (SearchBox.Text ?? "")
             .Split((char[]?)null, StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries);
 
@@ -365,7 +376,6 @@ public partial class MainWindow : Window
                  x.Tags.Any(t => t.Contains(captured, StringComparison.OrdinalIgnoreCase))));
         }
 
-        var useTableFilters = TableLayoutPanel.Visibility == Visibility.Visible;
         var tableGame = useTableFilters ? TableGameFilter.Text?.Trim() ?? "" : "";
         var tableType = useTableFilters ? TableTypeFilter.Text?.Trim() ?? "" : "";
         var tableCodec = useTableFilters ? TableCodecFilter.Text?.Trim() ?? "" : "";
@@ -430,15 +440,54 @@ public partial class MainWindow : Window
             ? "All tags" : previous;
     }
 
+    private void UpdateTimelineEventTypeFilter()
+    {
+        var previous = _selectedTimelineEventType;
+        var options = _allItems
+            .SelectMany(item => item.TimelineEvents)
+            .GroupBy(timelineEvent => timelineEvent.Type, StringComparer.OrdinalIgnoreCase)
+            .Select(group => new TimelineEventFilterItem(group.Key, group.First().TypeLabel))
+            .OrderBy(option => option.Name, StringComparer.CurrentCultureIgnoreCase)
+            .ToList();
+        options.Insert(0, new TimelineEventFilterItem("", "All event types"));
+
+        _updatingTimelineEventFilter = true;
+        try
+        {
+            TimelineEventFilter.ItemsSource = options;
+            TimelineEventFilter.SelectedItem = options.FirstOrDefault(option =>
+                                                   option.Type.Equals(previous, StringComparison.OrdinalIgnoreCase))
+                                               ?? options[0];
+            _selectedTimelineEventType = (TimelineEventFilter.SelectedItem as TimelineEventFilterItem)?.Type ?? "";
+        }
+        finally
+        {
+            _updatingTimelineEventFilter = false;
+        }
+
+        UpdateTimelineEventFilterVisibility();
+    }
+
+    private void UpdateTimelineEventFilterVisibility()
+    {
+        TimelineEventFilterPanel.Visibility = TableLayoutPanel.Visibility != Visibility.Visible &&
+                                              _allItems.Any(item => item.TimelineEvents.Count > 0)
+            ? Visibility.Visible
+            : Visibility.Collapsed;
+    }
+
     private void UpdateFilterStatus()
     {
+        var useTableFilters = TableLayoutPanel.Visibility == Visibility.Visible;
         var active =
             !string.IsNullOrWhiteSpace(_selectedGameId) ||
             !string.IsNullOrWhiteSpace(_selectedTag) ||
             FavoritesOnly.IsChecked == true ||
             !string.IsNullOrWhiteSpace(SearchBox.Text) ||
-            TableLayoutPanel.Visibility == Visibility.Visible &&
-            (!string.IsNullOrWhiteSpace(TableGameFilter.Text) ||
+            !useTableFilters && !string.IsNullOrWhiteSpace(_selectedTimelineEventType) ||
+            useTableFilters &&
+            (TableAchievementFilter.IsChecked == true ||
+             !string.IsNullOrWhiteSpace(TableGameFilter.Text) ||
              !string.IsNullOrWhiteSpace(TableTypeFilter.Text) ||
              !string.IsNullOrWhiteSpace(TableCodecFilter.Text) ||
              !string.IsNullOrWhiteSpace(TableMetadataFilter.Text));
@@ -984,7 +1033,14 @@ public partial class MainWindow : Window
         TableTypeFilter.Clear();
         TableCodecFilter.Clear();
         TableMetadataFilter.Clear();
+        TableAchievementFilter.IsChecked = false;
         ApplyFilter();
+    }
+
+    private void TableAchievementFilter_Click(object sender, RoutedEventArgs e)
+    {
+        ApplyFilter();
+        e.Handled = true;
     }
 
     private void InitializeTableColumns()
@@ -996,18 +1052,25 @@ public partial class MainWindow : Window
                 .Where(column => !string.IsNullOrWhiteSpace(column.Name))
                 .GroupBy(column => column.Name, StringComparer.OrdinalIgnoreCase)
                 .ToDictionary(group => group.Key, group => group.First(), StringComparer.OrdinalIgnoreCase);
+            var achievementDisplayOrder = saved.TryGetValue("Favorite", out var favoriteSetting)
+                ? favoriteSetting.DisplayIndex + 0.5
+                : 0.5;
             var ordered = RecordingTable.Columns
                 .Select((column, defaultIndex) => new
                 {
                     Column = column,
                     Name = ReferenceEquals(column, FavoriteColumn)
                         ? "Favorite"
+                        : ReferenceEquals(column, AchievementColumn)
+                            ? "Achievements"
                         : column.Header?.ToString() ?? $"Column {defaultIndex + 1}",
                     DefaultIndex = defaultIndex
                 })
                 .OrderBy(entry => saved.TryGetValue(entry.Name, out var setting)
                     ? setting.DisplayIndex
-                    : int.MaxValue)
+                    : ReferenceEquals(entry.Column, AchievementColumn)
+                        ? achievementDisplayOrder
+                        : int.MaxValue)
                 .ThenBy(entry => entry.DefaultIndex)
                 .ToList();
 
@@ -1018,7 +1081,9 @@ public partial class MainWindow : Window
             foreach (var entry in ordered)
             {
                 var visible = !saved.TryGetValue(entry.Name, out var setting) || setting.IsVisible;
-                if (setting?.Width > 0)
+                if (ReferenceEquals(entry.Column, AchievementColumn))
+                    entry.Column.Width = new DataGridLength(38);
+                else if (setting?.Width > 0)
                     entry.Column.Width = new DataGridLength(Math.Clamp(setting.Width, 40, 1200));
                 entry.Column.Visibility = visible ? Visibility.Visible : Visibility.Collapsed;
                 _tableColumnOptions.Add(new TableColumnOption(entry.Name, entry.Column, visible));
@@ -1221,6 +1286,15 @@ public partial class MainWindow : Window
         ApplyFilter();
     }
 
+    private void TimelineEventFilter_SelectionChanged(object sender, SelectionChangedEventArgs e)
+    {
+        if (_updatingTimelineEventFilter)
+            return;
+
+        _selectedTimelineEventType = (TimelineEventFilter.SelectedItem as TimelineEventFilterItem)?.Type ?? "";
+        ApplyFilter();
+    }
+
     private void SortFilter_SelectionChanged(object sender, SelectionChangedEventArgs e)
     {
         _sortMode = SortFilter.SelectedItem as string ?? "Newest";
@@ -1236,11 +1310,14 @@ public partial class MainWindow : Window
         TableTypeFilter.Clear();
         TableCodecFilter.Clear();
         TableMetadataFilter.Clear();
+        TableAchievementFilter.IsChecked = false;
         FavoritesOnly.IsChecked = false;
         _selectedGameId = "";
         _selectedTag = "";
+        _selectedTimelineEventType = "";
         UpdateGameFilter();
         UpdateTagFilter();
+        UpdateTimelineEventTypeFilter();
         ApplyFilter();
     }
 
@@ -1318,6 +1395,7 @@ public partial class MainWindow : Window
         RecordingList.ItemsSource = layout == "List" ? _visibleItems : null;
         TileRecordingList.ItemsSource = layout == "Tiles" ? _visibleItems : null;
         RecordingTable.ItemsSource = layout == "Table" ? _visibleItems : null;
+        UpdateTimelineEventFilterVisibility();
 
         ApplyFilter();
 
@@ -1423,6 +1501,7 @@ public partial class MainWindow : Window
     }
 
     private sealed record GameFilterItem(string Id, string Name);
+    private sealed record TimelineEventFilterItem(string Type, string Name);
 
     private sealed class TableColumnOption : INotifyPropertyChanged
     {

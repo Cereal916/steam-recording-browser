@@ -10,6 +10,8 @@ namespace SteamRecordingBrowser.Services;
 public sealed class SteamService
 {
     private readonly Dictionary<string, string?> _coverArtCache = new(StringComparer.OrdinalIgnoreCase);
+    private readonly Dictionary<string, IReadOnlyDictionary<string, string>> _achievementNameCache =
+        new(StringComparer.OrdinalIgnoreCase);
 
     public static Uri GetRecordingUri(string appId, bool isAutoRecording)
     {
@@ -188,6 +190,37 @@ public sealed class SteamService
         }
     }
 
+    public IReadOnlyDictionary<string, string> GetAchievementNames(string appId)
+    {
+        if (string.IsNullOrWhiteSpace(appId))
+            return new Dictionary<string, string>();
+
+        if (_achievementNameCache.TryGetValue(appId, out var cached))
+            return cached;
+
+        IReadOnlyDictionary<string, string> result = new Dictionary<string, string>();
+        try
+        {
+            var install = GetSteamInstallPath();
+            if (install is not null)
+            {
+                var schemaPath = Path.Combine(
+                    install,
+                    "appcache",
+                    "stats",
+                    $"UserGameStatsSchema_{appId}.bin");
+                result = SteamAchievementService.ReadNames(schemaPath, GetSteamLanguage());
+            }
+        }
+        catch (Exception ex)
+        {
+            AppLogger.Write($"Could not resolve achievement names for app {appId}: {ex.Message}", "DEBUG");
+        }
+
+        _achievementNameCache[appId] = result;
+        return result;
+    }
+
     private static string? FindArtwork(string root, string fileNameWithoutExtension)
     {
         foreach (var extension in new[] { ".jpg", ".png", ".webp" })
@@ -253,6 +286,15 @@ public sealed class SteamService
         }
 
         return null;
+    }
+
+    private static string GetSteamLanguage()
+    {
+        var language = Registry.GetValue(
+            @"HKEY_CURRENT_USER\Software\Valve\Steam",
+            "Language",
+            null) as string;
+        return string.IsNullOrWhiteSpace(language) ? "english" : language;
     }
 
     private static string MatchAcf(string text, string key)

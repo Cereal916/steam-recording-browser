@@ -16,7 +16,8 @@ public static class SteamTimelineService
         string recordingPath,
         string gameId,
         DateTime playbackStartTime,
-        double durationSeconds)
+        double durationSeconds,
+        IReadOnlyDictionary<string, string>? achievementNames = null)
     {
         if (string.IsNullOrWhiteSpace(recordingPath) ||
             string.IsNullOrWhiteSpace(gameId) ||
@@ -32,7 +33,7 @@ public static class SteamTimelineService
             var recordingEnd = playbackStartTime.AddSeconds(durationSeconds);
             return Directory.EnumerateFiles(timelineDirectory, "timeline_*.json", SearchOption.TopDirectoryOnly)
                 .Where(path => IsTimelineForGame(path, gameId))
-                .SelectMany(path => ReadTimelineFile(path, playbackStartTime, recordingEnd))
+                .SelectMany(path => ReadTimelineFile(path, playbackStartTime, recordingEnd, achievementNames))
                 .DistinctBy(value => new
                 {
                     value.Type,
@@ -55,7 +56,8 @@ public static class SteamTimelineService
     private static IEnumerable<SteamTimelineEvent> ReadTimelineFile(
         string path,
         DateTime recordingStart,
-        DateTime recordingEnd)
+        DateTime recordingEnd,
+        IReadOnlyDictionary<string, string>? achievementNames)
     {
         JsonDocument document;
         try
@@ -98,7 +100,7 @@ public static class SteamTimelineService
             for (var index = 0; index < entries.Length; index++)
             {
                 var entry = entries[index];
-                if (!TryDescribe(entry, out var typeLabel, out var title))
+                if (!TryDescribe(entry, achievementNames, out var typeLabel, out var title))
                     continue;
 
                 var durationMilliseconds = Math.Max(0, entry.DurationMilliseconds);
@@ -168,7 +170,11 @@ public static class SteamTimelineService
             possibleClip);
     }
 
-    private static bool TryDescribe(TimelineEntry entry, out string typeLabel, out string title)
+    private static bool TryDescribe(
+        TimelineEntry entry,
+        IReadOnlyDictionary<string, string>? achievementNames,
+        out string typeLabel,
+        out string title)
     {
         typeLabel = "";
         title = "";
@@ -181,6 +187,13 @@ public static class SteamTimelineService
             case "achievement":
                 typeLabel = "Achievement";
                 title = string.IsNullOrWhiteSpace(entry.Title) ? entry.AchievementName : entry.Title;
+                if (!string.IsNullOrWhiteSpace(entry.AchievementName) &&
+                    achievementNames?.TryGetValue(entry.AchievementName, out var displayName) == true &&
+                    (string.IsNullOrWhiteSpace(entry.Title) ||
+                     entry.Title.Equals(entry.AchievementName, StringComparison.OrdinalIgnoreCase)))
+                    title = displayName;
+                if (string.IsNullOrWhiteSpace(title))
+                    title = "Achievement";
                 break;
             case "state_description":
                 typeLabel = "Game state";

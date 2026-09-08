@@ -103,6 +103,57 @@ public sealed class SteamTimelineServiceTests
         Assert.Empty(events);
     }
 
+    [Fact]
+    public void ReadForRecording_KeepsUnnamedAchievementsForCounting()
+    {
+        using var fixture = new TimelineFixture();
+        fixture.WriteTimeline("42", new
+        {
+            daterecorded = TimelineStart.ToUnixTimeSeconds(),
+            entries = new[]
+            {
+                new { id = "1", time = "10000", type = "achievement" }
+            },
+            endtime = "60000"
+        });
+
+        var timelineEvent = Assert.Single(SteamTimelineService.ReadForRecording(
+            fixture.ManifestPath,
+            "42",
+            TimelineStart.LocalDateTime,
+            60));
+
+        Assert.Equal("Achievement", timelineEvent.Title);
+        Assert.Equal("Achievement", timelineEvent.TypeLabel);
+    }
+
+    [Fact]
+    public void ReadForRecording_ResolvesAchievementApiNames()
+    {
+        using var fixture = new TimelineFixture();
+        fixture.WriteTimeline("42", new
+        {
+            daterecorded = TimelineStart.ToUnixTimeSeconds(),
+            entries = new[]
+            {
+                new { id = "1", time = "10000", type = "achievement", achievement_name = "PvE04" }
+            },
+            endtime = "60000"
+        });
+
+        var timelineEvent = Assert.Single(SteamTimelineService.ReadForRecording(
+            fixture.ManifestPath,
+            "42",
+            TimelineStart.LocalDateTime,
+            60,
+            new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase)
+            {
+                ["PvE04"] = "Death From Above"
+            }));
+
+        Assert.Equal("Death From Above", timelineEvent.Title);
+    }
+
     private static object CreateSingleEvent(string title) => new
     {
         daterecorded = TimelineStart.ToUnixTimeSeconds(),

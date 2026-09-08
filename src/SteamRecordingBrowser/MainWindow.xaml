@@ -358,6 +358,23 @@
                 </Grid>
 
                 <DockPanel Margin="0,10,0,0" LastChildFill="False">
+                    <StackPanel x:Name="TimelineEventFilterPanel"
+                                DockPanel.Dock="Left"
+                                Orientation="Horizontal"
+                                Visibility="Collapsed">
+                        <TextBlock Text="Timeline events"
+                                   Foreground="{StaticResource Muted}"
+                                   FontWeight="SemiBold"
+                                   VerticalAlignment="Center"
+                                   Margin="0,0,9,0"/>
+                        <ComboBox x:Name="TimelineEventFilter"
+                                  Width="190"
+                                  Height="32"
+                                  DisplayMemberPath="Name"
+                                  SelectionChanged="TimelineEventFilter_SelectionChanged"
+                                  ToolTip="Show clips containing the selected Steam Timeline event type"
+                                  AutomationProperties.Name="Timeline event type filter"/>
+                    </StackPanel>
                     <StackPanel x:Name="FilterStatusPanel" DockPanel.Dock="Right"
                                 Orientation="Horizontal" Visibility="Collapsed">
                         <TextBlock x:Name="FilterStatusText" Foreground="{StaticResource Muted}" VerticalAlignment="Center" Margin="0,0,10,0"/>
@@ -389,7 +406,7 @@
                             CornerRadius="9" Margin="8,5" Padding="12"
                             MouseEnter="RecordingCard_MouseEnter"
                             MouseLeave="RecordingCard_MouseLeave">
-                        <Grid Height="118">
+                        <Grid Height="150">
                             <Grid.ColumnDefinitions>
                                 <ColumnDefinition Width="190"/>
                                 <ColumnDefinition Width="*"/>
@@ -471,6 +488,28 @@
                                 <TextBlock Text="{Binding AnnotationDescription}" Foreground="#CDD4DF" Margin="0,9,0,0"
                                            TextTrimming="CharacterEllipsis"/>
                                 <TextBlock Text="{Binding AnnotationTagDisplay}" Foreground="#71ABD0" FontSize="12" Margin="0,5,0,0"/>
+                                <StackPanel Margin="0,7,0,0">
+                                    <StackPanel.Style>
+                                        <Style TargetType="StackPanel">
+                                            <Setter Property="Visibility" Value="Collapsed"/>
+                                            <Style.Triggers>
+                                                <DataTrigger Binding="{Binding HasAchievements}" Value="True">
+                                                    <Setter Property="Visibility" Value="Visible"/>
+                                                </DataTrigger>
+                                            </Style.Triggers>
+                                        </Style>
+                                    </StackPanel.Style>
+                                    <TextBlock Text="ACHIEVEMENTS"
+                                               Foreground="#D8B45C"
+                                               FontSize="9"
+                                               FontWeight="Bold"/>
+                                    <TextBlock Text="{Binding AchievementDisplayText}"
+                                               Foreground="#E3E8EF"
+                                               FontSize="11"
+                                               Margin="0,2,0,0"
+                                               TextTrimming="CharacterEllipsis"
+                                               ToolTip="{Binding AchievementToolTip}"/>
+                                </StackPanel>
                             </StackPanel>
 
                             <StackPanel Grid.Column="2" VerticalAlignment="Center" HorizontalAlignment="Right">
@@ -593,6 +632,31 @@
                                                    Foreground="#F4F7FB"
                                                    FontWeight="SemiBold"
                                                    FontSize="12"/>
+                                    </Border>
+                                    <Border HorizontalAlignment="Left"
+                                            VerticalAlignment="Top"
+                                            Margin="6"
+                                            Padding="6,3"
+                                            Background="#E0262114"
+                                            BorderBrush="#B8892E"
+                                            BorderThickness="1"
+                                            CornerRadius="4"
+                                            ToolTip="{Binding AchievementToolTip}">
+                                        <Border.Style>
+                                            <Style TargetType="Border">
+                                                <Setter Property="Visibility" Value="Collapsed"/>
+                                                <Style.Triggers>
+                                                    <DataTrigger Binding="{Binding HasAchievements}" Value="True">
+                                                        <Setter Property="Visibility" Value="Visible"/>
+                                                    </DataTrigger>
+                                                </Style.Triggers>
+                                            </Style>
+                                        </Border.Style>
+                                        <TextBlock Text="{Binding AchievementIconText}"
+                                                   Foreground="#F4C35A"
+                                                   FontFamily="Segoe UI Emoji"
+                                                   FontSize="12"
+                                                   FontWeight="SemiBold"/>
                                     </Border>
                                 </Grid>
                             </Border>
@@ -851,6 +915,93 @@
                                         </Style>
                                     </Button.Style>
                                 </Button>
+                            </DataTemplate>
+                        </DataGridTemplateColumn.CellTemplate>
+                    </DataGridTemplateColumn>
+                    <DataGridTemplateColumn x:Name="AchievementColumn"
+                                            Width="38"
+                                            MinWidth="38"
+                                            MaxWidth="38"
+                                            CanUserResize="False">
+                        <DataGridTemplateColumn.HeaderStyle>
+                            <Style TargetType="DataGridColumnHeader" BasedOn="{StaticResource DarkDataGridHeader}">
+                                <Setter Property="Padding" Value="0"/>
+                                <Setter Property="HorizontalContentAlignment" Value="Center"/>
+                                <Setter Property="Template">
+                                    <Setter.Value>
+                                        <ControlTemplate TargetType="DataGridColumnHeader">
+                                            <Border Background="{TemplateBinding Background}"
+                                                    BorderBrush="{TemplateBinding BorderBrush}"
+                                                    BorderThickness="{TemplateBinding BorderThickness}">
+                                                <ContentPresenter HorizontalAlignment="Center"
+                                                                  VerticalAlignment="Center"/>
+                                            </Border>
+                                        </ControlTemplate>
+                                    </Setter.Value>
+                                </Setter>
+                            </Style>
+                        </DataGridTemplateColumn.HeaderStyle>
+                        <DataGridTemplateColumn.Header>
+                            <ToggleButton x:Name="TableAchievementFilter"
+                                          VerticalAlignment="Center"
+                                          Cursor="Hand"
+                                          ToolTip="Show only clips containing achievements"
+                                          Click="TableAchievementFilter_Click"
+                                          AutomationProperties.Name="Show only clips containing achievements">
+                                <ToggleButton.Style>
+                                    <Style TargetType="ToggleButton">
+                                        <Setter Property="Foreground" Value="#7D8794"/>
+                                        <Setter Property="Background" Value="Transparent"/>
+                                        <Setter Property="BorderThickness" Value="0"/>
+                                        <Setter Property="Padding" Value="0"/>
+                                        <Setter Property="Template">
+                                            <Setter.Value>
+                                                <ControlTemplate TargetType="ToggleButton">
+                                                    <Border x:Name="ToggleSurface"
+                                                            Background="{TemplateBinding Background}"
+                                                            BorderBrush="#697789"
+                                                            BorderThickness="0"
+                                                            CornerRadius="5"
+                                                            Padding="5,4">
+                                                        <Path Width="18" Height="18"
+                                                              Stretch="Uniform"
+                                                              Fill="{TemplateBinding Foreground}"
+                                                              Data="M17,3 L17,2 L7,2 L7,3 L3,3 L3,8 C3,10.21 4.79,12 7,12 C7.55,13.47 8.78,14.62 10.31,15.16 C9.89,16.03 9.13,16.68 8.2,17 L8,19 L5,19 L5,21 L19,21 L19,19 L16,19 L15.8,17 C14.87,16.68 14.11,16.03 13.69,15.16 C15.22,14.62 16.45,13.47 17,12 C19.21,12 21,10.21 21,8 L21,3 Z M5,8 L5,5 L7,5 L7,9.82 C5.84,9.41 5,8.3 5,8 M19,8 C19,8.3 18.16,9.41 17,9.82 L17,5 L19,5 Z"/>
+                                                    </Border>
+                                                    <ControlTemplate.Triggers>
+                                                        <Trigger Property="IsMouseOver" Value="True">
+                                                            <Setter TargetName="ToggleSurface" Property="Background" Value="#26313E"/>
+                                                            <Setter Property="Foreground" Value="#B8C1CC"/>
+                                                        </Trigger>
+                                                        <Trigger Property="IsKeyboardFocused" Value="True">
+                                                            <Setter TargetName="ToggleSurface" Property="BorderThickness" Value="1"/>
+                                                        </Trigger>
+                                                        <Trigger Property="IsChecked" Value="True">
+                                                            <Setter Property="Foreground" Value="#F6C85F"/>
+                                                        </Trigger>
+                                                    </ControlTemplate.Triggers>
+                                                </ControlTemplate>
+                                            </Setter.Value>
+                                        </Setter>
+                                    </Style>
+                                </ToggleButton.Style>
+                            </ToggleButton>
+                        </DataGridTemplateColumn.Header>
+                        <DataGridTemplateColumn.CellStyle>
+                            <Style TargetType="DataGridCell" BasedOn="{StaticResource DarkDataGridCell}">
+                                <Setter Property="HorizontalContentAlignment" Value="Center"/>
+                                <Setter Property="Padding" Value="0"/>
+                            </Style>
+                        </DataGridTemplateColumn.CellStyle>
+                        <DataGridTemplateColumn.CellTemplate>
+                            <DataTemplate>
+                                <TextBlock Text="{Binding AchievementCheckGlyph}"
+                                           Foreground="#65CA89"
+                                           FontSize="17"
+                                           FontWeight="Bold"
+                                           HorizontalAlignment="Center"
+                                           VerticalAlignment="Center"
+                                           ToolTip="{Binding AchievementToolTip}"/>
                             </DataTemplate>
                         </DataGridTemplateColumn.CellTemplate>
                     </DataGridTemplateColumn>
