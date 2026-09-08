@@ -9,6 +9,8 @@ The project follows semantic versioning beginning with **1.0.0**.
 
 ## Unreleased
 
+## 1.7.0 - 2026-09-08
+
 ### Added
 
 - Added achievement badges, names, counts, and achievement-aware filtering to
