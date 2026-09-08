@@ -23,6 +23,7 @@ public sealed class RecordingItem : INotifyPropertyChanged
     public string? DisplayImagePath => ThumbnailPath ?? CoverArtPath;
     public bool IsAutoRecording { get; init; }
     public bool IsSavedClip => !IsAutoRecording;
+    public string? SteamClipId { get; init; }
     public IReadOnlyList<string> SessionPaths { get; init; } = Array.Empty<string>();
     public IReadOnlyList<double> SessionStartOffsetsSeconds { get; init; } = Array.Empty<double>();
     public IReadOnlyList<DateTime> SessionStartTimes { get; init; } = Array.Empty<DateTime>();
@@ -54,7 +55,9 @@ public sealed class RecordingItem : INotifyPropertyChanged
         IsAutoRecording ? "AUTO RECORDING" : "SAVED CLIP";
     public string OpenInSteamToolTip => IsAutoRecording
         ? "Open this game's recording timeline in Steam"
-        : "Open this game's media library in Steam";
+        : !string.IsNullOrWhiteSpace(SteamClipId)
+            ? "Open this exact clip in Steam"
+            : "Open this game's media library in Steam";
     public bool SupportsAnnotations => IsSavedClip && !IsLive;
 
     public string DisplayTime => Timestamp.ToString("MMM d, yyyy  h:mm:ss tt");

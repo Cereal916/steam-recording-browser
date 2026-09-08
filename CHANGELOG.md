@@ -12,7 +12,9 @@ The project follows semantic versioning beginning with **1.0.0**.
 ### Added
 
 - Added an **Open in Steam** action for saved clips and automatic recordings
-  from every clip layout and the video player.
+  from every clip layout and the video player. Saved clips open directly in
+  Steam's player using their clip ID, with the game's media library as a
+  fallback when the ID cannot be resolved.
 
 ### Changed
 

@@ -1,5 +1,6 @@
 using System.IO;
 using System.Text;
+using System.Text.RegularExpressions;
 
 namespace SteamRecordingBrowser.Services;
 
@@ -7,6 +8,23 @@ namespace SteamRecordingBrowser.Services;
 // useful in the UI. Unknown fields are skipped so Steam can extend the file.
 public static class SteamClipMetadataService
 {
+    public static string? GetClipIdForRecording(string recordingPath)
+    {
+        var metadataPath = FindClipFile(recordingPath);
+        if (metadataPath is null) return null;
+
+        // Steam identifies a saved clip by the folder containing clip.pb,
+        // not the bg_/fg_ video session nested inside it. Several saved clips
+        // can contain copies of the same original recording session.
+        var clipId = Path.GetFileName(Path.GetDirectoryName(metadataPath));
+        return clipId is not null && Regex.IsMatch(
+            clipId,
+            @"\Aclip_[0-9]+_[0-9]{8}_[0-9]{6}(?:_[0-9]+)?\z",
+            RegexOptions.IgnoreCase)
+            ? clipId
+            : null;
+    }
+
     public static IReadOnlyList<string> ReadForRecording(string recordingPath)
     {
         var metadataPath = FindClipFile(recordingPath);

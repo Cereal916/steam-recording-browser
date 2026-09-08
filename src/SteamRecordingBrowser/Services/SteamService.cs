@@ -23,15 +23,24 @@ public sealed class SteamService
         return new Uri($"steam://open/{destination}/{numericAppId}", UriKind.Absolute);
     }
 
-    public static void OpenRecordingInSteam(RecordingItem item)
+    public static Uri GetRecordingUri(RecordingItem item)
     {
         ArgumentNullException.ThrowIfNull(item);
 
-        var uri = GetRecordingUri(item.GameId, item.IsAutoRecording);
+        // The desktop Steam client accepts the saved clip's ID at open/clip.
+        // Resolve it before validating GameId: clips from fg_ sessions may
+        // have a known clip ID even when the scanner cannot identify the game.
+        if (item.IsSavedClip && !string.IsNullOrWhiteSpace(item.SteamClipId))
+            return new Uri($"steam://open/clip/{Uri.EscapeDataString(item.SteamClipId)}", UriKind.Absolute);
+
+        return GetRecordingUri(item.GameId, item.IsAutoRecording);
+    }
+
+    public static void OpenRecordingInSteam(RecordingItem item)
+    {
+        var uri = GetRecordingUri(item);
         Process.Start(new ProcessStartInfo(uri.AbsoluteUri) { UseShellExecute = true });
-        AppLogger.Write(
-            $"Opened Steam {(item.IsAutoRecording ? "recording timeline" : "media library")} " +
-            $"for app {item.GameId} from {item.Path}.");
+        AppLogger.Write($"Requested Steam media at {uri.AbsoluteUri} from {item.Path}.");
     }
 
     public string? FindDefaultRecordingRoot()

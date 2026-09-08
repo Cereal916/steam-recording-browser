@@ -110,6 +110,7 @@ public sealed class RecordingScanner
             ThumbnailPath = FindSteamThumbnail(mpdPath),
             CoverArtPath = _steam.FindCachedCoverArt(gameId),
             IsAutoRecording = hasFolderIdentity && !isSavedClip,
+            SteamClipId = isSavedClip ? SteamClipMetadataService.GetClipIdForRecording(mpdPath) : null,
             IsLive = hasFolderIdentity && !isSavedClip && LiveRecordingService.IsActivelyRecording(mpdPath),
             SessionPaths = new[] { mpdPath },
             SessionStartOffsetsSeconds = new[] { 0d },
