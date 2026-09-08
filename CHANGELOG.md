@@ -9,6 +9,8 @@ The project follows semantic versioning beginning with **1.0.0**.
 
 ## Unreleased
 
+## 1.6.0 - 2026-09-08
+
 ### Added
 
 - Added an **Open in Steam** action for saved clips and automatic recordings
