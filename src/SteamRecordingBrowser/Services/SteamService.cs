@@ -1,12 +1,38 @@
+using System.Diagnostics;
+using System.Globalization;
 using System.IO;
 using Microsoft.Win32;
 using System.Text.RegularExpressions;
+using SteamRecordingBrowser.Models;
 
 namespace SteamRecordingBrowser.Services;
 
 public sealed class SteamService
 {
     private readonly Dictionary<string, string?> _coverArtCache = new(StringComparer.OrdinalIgnoreCase);
+
+    public static Uri GetRecordingUri(string appId, bool isAutoRecording)
+    {
+        if (!ulong.TryParse(appId, NumberStyles.None, CultureInfo.InvariantCulture, out var numericAppId) ||
+            numericAppId == 0)
+        {
+            throw new ArgumentException("A valid Steam app ID is required.", nameof(appId));
+        }
+
+        var destination = isAutoRecording ? "recording" : "screenshots";
+        return new Uri($"steam://open/{destination}/{numericAppId}", UriKind.Absolute);
+    }
+
+    public static void OpenRecordingInSteam(RecordingItem item)
+    {
+        ArgumentNullException.ThrowIfNull(item);
+
+        var uri = GetRecordingUri(item.GameId, item.IsAutoRecording);
+        Process.Start(new ProcessStartInfo(uri.AbsoluteUri) { UseShellExecute = true });
+        AppLogger.Write(
+            $"Opened Steam {(item.IsAutoRecording ? "recording timeline" : "media library")} " +
+            $"for app {item.GameId} from {item.Path}.");
+    }
 
     public string? FindDefaultRecordingRoot()
     {

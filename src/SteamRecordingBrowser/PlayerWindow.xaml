@@ -454,6 +454,11 @@
                                 Margin="0,0,8,0"
                                 Padding="12,6"
                                 Click="Favorite_Click"/>
+                        <Button x:Name="OpenInSteamButton"
+                                Content="Open in Steam"
+                                Margin="0,0,8,0"
+                                Padding="12,6"
+                                Click="OpenInSteam_Click"/>
                         <Button Content="Export MP4…"
                                 Padding="12,6"
                                 Click="Export_Click"/>

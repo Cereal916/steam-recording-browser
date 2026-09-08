@@ -52,6 +52,9 @@ public sealed class RecordingItem : INotifyPropertyChanged
 
     public string RecordingTypeLabel => IsLive ? "LIVE • AUTO RECORDING" :
         IsAutoRecording ? "AUTO RECORDING" : "SAVED CLIP";
+    public string OpenInSteamToolTip => IsAutoRecording
+        ? "Open this game's recording timeline in Steam"
+        : "Open this game's media library in Steam";
     public bool SupportsAnnotations => IsSavedClip && !IsLive;
 
     public string DisplayTime => Timestamp.ToString("MMM d, yyyy  h:mm:ss tt");

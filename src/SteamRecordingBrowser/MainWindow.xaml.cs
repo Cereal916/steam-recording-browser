@@ -831,6 +831,27 @@ public partial class MainWindow : Window
 
     private void RecordingList_MouseDoubleClick(object sender, System.Windows.Input.MouseButtonEventArgs e) => PlaySelected();
     private void PlayMenu_Click(object sender, RoutedEventArgs e) => PlaySelected();
+    private void OpenInSteamMenu_Click(object sender, RoutedEventArgs e)
+    {
+        var item = SelectedItem;
+        if (item is null) return;
+
+        try
+        {
+            SteamService.OpenRecordingInSteam(item);
+        }
+        catch (Exception ex)
+        {
+            AppLogger.WriteException($"Could not open Steam for app {item.GameId}", ex);
+            WpfMessageBox.Show(
+                this,
+                "Steam could not be opened for this recording. Make sure Steam is installed and try again.",
+                "Could not open Steam",
+                WpfMessageBoxButton.OK,
+                WpfMessageBoxImage.Error);
+        }
+    }
+
     private void ExportMenu_Click(object sender, RoutedEventArgs e) => ExportSelected();
 
     private void FavoriteMenu_Click(object sender, RoutedEventArgs e)

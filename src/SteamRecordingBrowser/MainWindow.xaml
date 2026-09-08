@@ -485,6 +485,7 @@
             <ListView.ContextMenu>
                 <ContextMenu Opened="RecordingContextMenu_Opened">
                     <MenuItem Header="Play" Click="PlayMenu_Click"/>
+                    <MenuItem Header="Open in Steam" Click="OpenInSteamMenu_Click"/>
                     <MenuItem Header="Export to MP4…" Click="ExportMenu_Click"/>
                     <Separator/>
                     <MenuItem Header="Toggle favorite" Click="FavoriteMenu_Click"/>
@@ -643,6 +644,7 @@
             <ListView.ContextMenu>
                 <ContextMenu Opened="RecordingContextMenu_Opened">
                     <MenuItem Header="Play" Click="PlayMenu_Click"/>
+                    <MenuItem Header="Open in Steam" Click="OpenInSteamMenu_Click"/>
                     <MenuItem Header="Export to MP4…" Click="ExportMenu_Click"/>
                     <Separator/>
                     <MenuItem Header="Toggle favorite" Click="FavoriteMenu_Click"/>
@@ -923,6 +925,7 @@
                 <DataGrid.ContextMenu>
                     <ContextMenu Opened="RecordingContextMenu_Opened">
                         <MenuItem Header="Play" Click="PlayMenu_Click"/>
+                        <MenuItem Header="Open in Steam" Click="OpenInSteamMenu_Click"/>
                         <MenuItem Header="Export to MP4…" Click="ExportMenu_Click"/>
                         <Separator/>
                         <MenuItem Header="Toggle favorite" Click="FavoriteMenu_Click"/>

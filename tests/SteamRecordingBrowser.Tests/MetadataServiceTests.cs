@@ -5,6 +5,28 @@ namespace SteamRecordingBrowser.Tests;
 
 public sealed class MetadataServiceTests
 {
+    [Theory]
+    [InlineData("1808500", false, "steam://open/screenshots/1808500")]
+    [InlineData("1808500", true, "steam://open/recording/1808500")]
+    public void GetRecordingUri_UsesTheMatchingSteamMediaDestination(
+        string appId,
+        bool isAutoRecording,
+        string expected)
+    {
+        var uri = SteamService.GetRecordingUri(appId, isAutoRecording);
+
+        Assert.Equal(expected, uri.AbsoluteUri.TrimEnd('/'));
+    }
+
+    [Theory]
+    [InlineData("")]
+    [InlineData("not-an-app")]
+    [InlineData("0")]
+    public void GetRecordingUri_RejectsInvalidSteamAppIds(string appId)
+    {
+        Assert.Throws<ArgumentException>(() => SteamService.GetRecordingUri(appId, false));
+    }
+
     [Fact]
     public void GetRecordingKey_UsesStableSteamBackgroundIdentity()
     {

@@ -159,6 +159,7 @@ private readonly DispatcherTimer _hoverFramePauseTimer;
 
         Title = $"Steam Recording Browser — {item.GameName}";
         PlayerInfoBadge.ToolTip = item.VideoInfoText;
+        OpenInSteamButton.ToolTip = item.OpenInSteamToolTip;
         ClipInfoText.Text = $"{item.GameName}  •  {item.DisplayTime}  •  {item.RecordingTypeLabel}";
         LivePlaybackBadge.Visibility = item.IsLive ? Visibility.Visible : Visibility.Collapsed;
         GoLiveButton.Visibility = item.IsLive ? Visibility.Visible : Visibility.Collapsed;
@@ -3142,6 +3143,24 @@ private readonly DispatcherTimer _hoverFramePauseTimer;
                 "Steam Recording Browser",
                 MessageBoxButton.OK,
                 MessageBoxImage.Information);
+        }
+    }
+
+    private void OpenInSteam_Click(object sender, RoutedEventArgs e)
+    {
+        try
+        {
+            SteamService.OpenRecordingInSteam(_item);
+        }
+        catch (Exception ex)
+        {
+            AppLogger.WriteException($"Could not open Steam for app {_item.GameId}", ex);
+            System.Windows.MessageBox.Show(
+                this,
+                "Steam could not be opened for this recording. Make sure Steam is installed and try again.",
+                "Could not open Steam",
+                MessageBoxButton.OK,
+                MessageBoxImage.Error);
         }
     }
 

@@ -66,22 +66,13 @@ public sealed class RecordingScanner
         var timestamp = File.GetLastWriteTime(mpdPath);
         var isSavedClip = HasClipMetadata(mpdPath);
 
-        var match = Regex.Match(folder, @"^bg_(\d+)_(\d{8})_(\d{6})$", RegexOptions.IgnoreCase);
-        if (match.Success)
+        var hasFolderIdentity = TryParseRecordingFolderName(folder, out var parsedGameId, out var parsedTimestampUtc);
+        if (hasFolderIdentity)
         {
-            gameId = match.Groups[1].Value;
-            if (DateTime.TryParseExact(
-                match.Groups[2].Value + match.Groups[3].Value,
-                "yyyyMMddHHmmss",
-                System.Globalization.CultureInfo.InvariantCulture,
-                System.Globalization.DateTimeStyles.AssumeUniversal |
-                System.Globalization.DateTimeStyles.AdjustToUniversal,
-                out var parsed))
-            {
-                // Steam encodes background-recording folder timestamps in UTC.
-                // RecordingItem timestamps are displayed as local wall-clock time.
-                timestamp = parsed.ToLocalTime();
-            }
+            gameId = parsedGameId;
+            // Steam encodes background-recording folder timestamps in UTC.
+            // RecordingItem timestamps are displayed as local wall-clock time.
+            timestamp = parsedTimestampUtc.ToLocalTime();
         }
 
         long size = 0;
@@ -101,7 +92,7 @@ public sealed class RecordingScanner
             : gameId.Length > 0 ? $"App {gameId}" : "Unknown game";
 
         var durationSeconds = _dash.GetDurationSeconds(mpdPath);
-        if (durationSeconds <= 0 && match.Success && !isSavedClip &&
+        if (durationSeconds <= 0 && hasFolderIdentity && !isSavedClip &&
             LiveRecordingService.IsActivelyRecording(mpdPath))
             durationSeconds = LiveRecordingService.GetDynamicDurationSeconds(mpdPath);
         var technicalInfo = _dash.GetMediaTechnicalInfo(mpdPath);
@@ -118,8 +109,8 @@ public sealed class RecordingScanner
             DurationSeconds = durationSeconds,
             ThumbnailPath = FindSteamThumbnail(mpdPath),
             CoverArtPath = _steam.FindCachedCoverArt(gameId),
-            IsAutoRecording = match.Success && !isSavedClip,
-            IsLive = match.Success && !isSavedClip && LiveRecordingService.IsActivelyRecording(mpdPath),
+            IsAutoRecording = hasFolderIdentity && !isSavedClip,
+            IsLive = hasFolderIdentity && !isSavedClip && LiveRecordingService.IsActivelyRecording(mpdPath),
             SessionPaths = new[] { mpdPath },
             SessionStartOffsetsSeconds = new[] { 0d },
             SessionStartTimes = new[] { timestamp },
@@ -130,6 +121,42 @@ public sealed class RecordingScanner
             Bitrate = technicalInfo.Bitrate,
             SteamMetadata = SteamClipMetadataService.ReadForRecording(mpdPath)
         };
+    }
+
+    public static bool TryParseRecordingFolderName(
+        string folder,
+        out string gameId,
+        out DateTime timestampUtc)
+    {
+        gameId = "";
+        timestampUtc = default;
+
+        if (string.IsNullOrWhiteSpace(folder))
+            return false;
+
+        // Steam may append a numeric part index (for example, `_0`) when a
+        // recording session is split. It remains part of the same app and
+        // uses the same UTC timestamp naming convention.
+        var match = Regex.Match(
+            folder,
+            @"^bg_(\d+)_(\d{8})_(\d{6})(?:_\d+)?$",
+            RegexOptions.IgnoreCase);
+        if (!match.Success)
+            return false;
+
+        if (!DateTime.TryParseExact(
+                match.Groups[2].Value + match.Groups[3].Value,
+                "yyyyMMddHHmmss",
+                System.Globalization.CultureInfo.InvariantCulture,
+                System.Globalization.DateTimeStyles.AssumeUniversal |
+                System.Globalization.DateTimeStyles.AdjustToUniversal,
+                out timestampUtc))
+        {
+            return false;
+        }
+
+        gameId = match.Groups[1].Value;
+        return true;
     }
 
     private static IEnumerable<RecordingItem> CollapseAutomaticRecordings(IReadOnlyCollection<RecordingItem> items)

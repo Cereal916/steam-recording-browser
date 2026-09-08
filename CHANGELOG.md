@@ -9,6 +9,11 @@ The project follows semantic versioning beginning with **1.0.0**.
 
 ## Unreleased
 
+### Added
+
+- Added an **Open in Steam** action for saved clips and automatic recordings
+  from every clip layout and the video player.
+
 ### Changed
 
 - Multi-session auto recordings now use a rolling wall-clock timeline with
@@ -21,6 +26,8 @@ The project follows semantic versioning beginning with **1.0.0**.
 
 ### Fixed
 
+- Steam recordings with numeric session suffixes are now attributed to their
+  game instead of appearing under an **Unknown game** filter.
 - Fixed playback and hover previews freezing when navigating between gameplay
   sessions, including after an auto recording has ended, or seeking backward
   from the live edge.
