@@ -128,6 +128,7 @@ private readonly DispatcherTimer _hoverFramePauseTimer;
     private const long LongVideoPreviewSegmentMs = 3_000;
     private const long FineScrubHalfWindowMs = 2 * 60 * 1000;
     private const long LiveEdgeSafetyDelayMs = 6_000;
+    private const long TimelineEventLeadInMs = 3_000;
     private const long RestartSeekToleranceMs = 3_500;
     private const double RestartSeekRetryIntervalMs = 2_000;
     private const double RestartSeekWarningDelayMs = 5_000;
@@ -153,6 +154,11 @@ private readonly DispatcherTimer _hoverFramePauseTimer;
         _vlc = vlc;
         _metadata = metadata;
         _item = item;
+        TimelineEventList.ItemsSource = item.TimelineEvents;
+        TimelineEventCountText.Text = item.TimelineEvents.Count.ToString("N0", CultureInfo.CurrentCulture);
+        TimelineEventBrowser.Visibility = item.TimelineEvents.Count > 0
+            ? Visibility.Visible
+            : Visibility.Collapsed;
         AnnotationPanel.Visibility = item.SupportsAnnotations
             ? Visibility.Visible
             : Visibility.Collapsed;
@@ -3180,6 +3186,14 @@ private readonly DispatcherTimer _hoverFramePauseTimer;
             : Math.Max(0, _player.Length));
     }
 
+    private void TimelineEventCanvas_SizeChanged(object sender, SizeChangedEventArgs e)
+    {
+        _timelineTicksWidth = -1;
+        UpdateTimelineTicks(_usesLiveClockTimeline
+            ? Math.Max(0, _historyLengthMs)
+            : Math.Max(0, _player.Length));
+    }
+
     private void UpdateTimelineTicks(long lengthMs)
     {
         var width = TimelineTickCanvas.ActualWidth;
@@ -3198,6 +3212,7 @@ private readonly DispatcherTimer _hoverFramePauseTimer;
         if (_usesLiveClockTimeline && _liveTimeline is not null)
         {
             RenderLiveClockTimelineTicks(lengthMs, width);
+            RenderTimelineEventMarkers(lengthMs, width);
             return;
         }
 
@@ -3296,6 +3311,159 @@ private readonly DispatcherTimer _hoverFramePauseTimer;
                 TimelineTickCanvas.Children.Add(marker);
             }
         }
+
+        RenderTimelineEventMarkers(lengthMs, width);
+    }
+
+    private void RenderTimelineEventMarkers(long lengthMs, double width)
+    {
+        TimelineEventCanvas.Children.Clear();
+        if (_item.TimelineEvents.Count == 0 || lengthMs <= 0 || width <= 0)
+            return;
+
+        foreach (var timelineEvent in _item.TimelineEvents
+                     .OrderBy(value => value.Priority)
+                     .ThenBy(value => value.PositionSeconds))
+        {
+            var mapped = MapTimelineEvent(timelineEvent, lengthMs);
+            if (mapped is null)
+                continue;
+
+            var startX = Math.Clamp(mapped.Value.StartMilliseconds / (double)lengthMs * width, 0, width);
+            var rangeWidth = mapped.Value.DurationMilliseconds > 0
+                ? mapped.Value.DurationMilliseconds / (double)lengthMs * width
+                : 0;
+            var height = timelineEvent.IsRange
+                ? 8d
+                : Math.Clamp(10d + timelineEvent.Priority / 250d, 10d, 15d);
+            var markerWidth = timelineEvent.IsRange
+                ? Math.Clamp(rangeWidth, 9d, Math.Max(9d, width))
+                : height;
+            markerWidth = Math.Min(markerWidth, Math.Max(1d, width));
+            var markerLeft = Math.Clamp(
+                timelineEvent.IsRange ? startX : startX - markerWidth / 2d,
+                0,
+                Math.Max(0, width - markerWidth));
+            var brush = GetTimelineEventBrush(timelineEvent);
+            var marker = new Button
+            {
+                Width = markerWidth,
+                Height = height,
+                Background = brush,
+                BorderBrush = brush,
+                Foreground = System.Windows.Media.Brushes.White,
+                FontSize = 7,
+                FontWeight = FontWeights.Bold,
+                Content = timelineEvent.IsSuggestedClip ? "★" : null,
+                Tag = timelineEvent,
+                ToolTip = timelineEvent.ToolTipText,
+                Style = (Style)FindResource("TimelineMarkerButton")
+            };
+            marker.Click += TimelineEvent_Click;
+            Canvas.SetLeft(marker, markerLeft);
+            Canvas.SetTop(marker, timelineEvent.IsRange ? 2 : 0);
+            Panel.SetZIndex(marker, Math.Max(0, timelineEvent.Priority));
+            TimelineEventCanvas.Children.Add(marker);
+        }
+    }
+
+    private (long StartMilliseconds, long DurationMilliseconds)? MapTimelineEvent(
+        SteamTimelineEvent timelineEvent,
+        long lengthMs)
+    {
+        if (_usesLiveClockTimeline && _liveTimeline is not null)
+        {
+            var eventStart = timelineEvent.Timestamp;
+            var eventEnd = eventStart.AddSeconds(Math.Max(0, timelineEvent.DurationSeconds));
+            foreach (var session in _liveTimeline.Sessions)
+            {
+                var sessionStart = GetSessionClockStart(session);
+                var sessionEnd = sessionStart.AddMilliseconds(session.DurationMilliseconds);
+                var instantaneous = timelineEvent.DurationSeconds <= 0;
+                if (instantaneous
+                        ? eventStart < sessionStart || eventStart > sessionEnd
+                        : eventEnd <= sessionStart || eventStart >= sessionEnd)
+                    continue;
+
+                var clippedStart = eventStart < sessionStart ? sessionStart : eventStart;
+                var clippedEnd = instantaneous
+                    ? clippedStart
+                    : eventEnd > sessionEnd ? sessionEnd : eventEnd;
+                var startMs = session.OffsetMilliseconds +
+                              (long)Math.Round((clippedStart - sessionStart).TotalMilliseconds);
+                var durationMs = (long)Math.Round((clippedEnd - clippedStart).TotalMilliseconds);
+                return (
+                    Math.Clamp(startMs, 0, lengthMs),
+                    Math.Clamp(durationMs, 0, Math.Max(0, lengthMs - startMs)));
+            }
+        }
+
+        var fallbackStart = (long)Math.Round(timelineEvent.PositionSeconds * 1000d);
+        var fallbackDuration = (long)Math.Round(timelineEvent.DurationSeconds * 1000d);
+        if (fallbackStart < 0 || fallbackStart > lengthMs)
+            return null;
+        return (
+            fallbackStart,
+            Math.Clamp(fallbackDuration, 0, Math.Max(0, lengthMs - fallbackStart)));
+    }
+
+    private static SolidColorBrush GetTimelineEventBrush(SteamTimelineEvent timelineEvent)
+    {
+        var color = timelineEvent.IsFeaturedClip
+            ? MediaColor.FromRgb(244, 195, 90)
+            : timelineEvent.IsSuggestedClip
+                ? MediaColor.FromRgb(215, 163, 63)
+                : timelineEvent.Type.ToLowerInvariant() switch
+                {
+                    "achievement" => MediaColor.FromRgb(101, 202, 137),
+                    "state_description" => MediaColor.FromRgb(105, 156, 187),
+                    "phase" => MediaColor.FromRgb(130, 142, 210),
+                    "screenshot" => MediaColor.FromRgb(178, 125, 218),
+                    "usermarker" => MediaColor.FromRgb(222, 228, 236),
+                    _ => MediaColor.FromRgb(102, 192, 244)
+                };
+        return new SolidColorBrush(color);
+    }
+
+    private void TimelineEvent_Click(object sender, RoutedEventArgs e)
+    {
+        if (sender is not FrameworkElement { Tag: SteamTimelineEvent timelineEvent })
+            return;
+
+        TimelinePreviewPopup.IsOpen = false;
+        SuspendHoverPreviewForPlayback();
+
+        var lengthMs = _usesLiveClockTimeline
+            ? Math.Max(0, _historyLengthMs)
+            : Math.Max(Math.Max(0, _player.Length), (long)Math.Round(_item.DurationSeconds * 1000d));
+        if (_usesLiveClockTimeline)
+            RefreshDynamicTimelineMapping();
+
+        var mapped = MapTimelineEvent(timelineEvent, lengthMs);
+        if (mapped is null)
+            return;
+
+        var targetMs = timelineEvent.IsRange
+            ? mapped.Value.StartMilliseconds
+            : Math.Max(0, mapped.Value.StartMilliseconds - TimelineEventLeadInMs);
+        if (_usesLiveClockTimeline && _liveDashServer is not null)
+        {
+            SeekLiveTimelinePosition(targetMs, $"Steam timeline event: {timelineEvent.Title}");
+        }
+        else if (_mediaEnded)
+        {
+            RestartMediaAt(targetMs);
+        }
+        else if (_player.Length > 0)
+        {
+            targetMs = Math.Clamp(targetMs, 0, _player.Length);
+            _player.Time = targetMs;
+            Timeline.Value = (double)targetMs / _player.Length;
+            BeginSeekSettlement(targetMs);
+            UpdateTimeline();
+        }
+
+        e.Handled = true;
     }
 
     private void RenderLiveClockTimelineTicks(long lengthMs, double width)

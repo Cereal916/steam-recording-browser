@@ -11,6 +11,9 @@ The project follows semantic versioning beginning with **1.0.0**.
 
 ### Added
 
+- Added clickable Steam Timeline event markers and an event browser in the
+  player for achievements, named game states, event ranges, screenshots, user
+  markers, and game-suggested clips.
 - Added a read-only storage dashboard with per-game usage, saved-clip and
   rolling-recording totals, oldest-recording discovery, and overlapping-footage
   analysis.

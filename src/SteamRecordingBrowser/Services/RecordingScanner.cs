@@ -119,6 +119,8 @@ public sealed class RecordingScanner
             SessionPlaybackStartTimes = new[] { playbackStartTime },
             SessionDurationsSeconds = new[] { durationSeconds },
             SessionSizesBytes = new[] { size },
+            TimelineEvents = SteamTimelineService.ReadForRecording(
+                mpdPath, gameId, playbackStartTime, durationSeconds),
             VideoCodec = technicalInfo.VideoCodec,
             AudioCodec = technicalInfo.AudioCodec,
             Resolution = technicalInfo.Resolution,
@@ -201,6 +203,7 @@ public sealed class RecordingScanner
                 SessionPlaybackStartTimes = sessions.Select(session => session.PlaybackStartTime).ToArray(),
                 SessionDurationsSeconds = sessions.Select(session => session.DurationSeconds).ToArray(),
                 SessionSizesBytes = sessions.Select(session => session.SizeBytes).ToArray(),
+                TimelineEvents = MergeTimelineEvents(sessions, offsets),
                 VideoCodec = primary.VideoCodec,
                 AudioCodec = primary.AudioCodec,
                 Resolution = primary.Resolution,
@@ -216,6 +219,47 @@ public sealed class RecordingScanner
                     .ToArray()
             };
         }
+    }
+
+    private static IReadOnlyList<SteamTimelineEvent> MergeTimelineEvents(
+        IReadOnlyList<RecordingItem> sessions,
+        IReadOnlyList<double> offsets)
+    {
+        var adjusted = sessions.SelectMany((session, index) =>
+                session.TimelineEvents.Select(timelineEvent => timelineEvent with
+                {
+                    PositionSeconds = offsets[index] + timelineEvent.PositionSeconds
+                }))
+            .OrderBy(timelineEvent => timelineEvent.PositionSeconds)
+            .ThenByDescending(timelineEvent => timelineEvent.Priority)
+            .ToArray();
+        var merged = new List<SteamTimelineEvent>(adjusted.Length);
+
+        foreach (var timelineEvent in adjusted)
+        {
+            var previousIndex = merged.FindLastIndex(candidate =>
+                candidate.Id.Equals(timelineEvent.Id, StringComparison.OrdinalIgnoreCase));
+            if (previousIndex >= 0 && timelineEvent.IsRange && merged[previousIndex].IsRange)
+            {
+                var previous = merged[previousIndex];
+                var previousEnd = previous.PositionSeconds + previous.DurationSeconds;
+                if (timelineEvent.PositionSeconds <= previousEnd + 2)
+                {
+                    var mergedEnd = Math.Max(
+                        previousEnd,
+                        timelineEvent.PositionSeconds + timelineEvent.DurationSeconds);
+                    merged[previousIndex] = previous with
+                    {
+                        DurationSeconds = mergedEnd - previous.PositionSeconds
+                    };
+                    continue;
+                }
+            }
+
+            merged.Add(timelineEvent);
+        }
+
+        return merged;
     }
 
     private static bool HasClipMetadata(string recordingPath)

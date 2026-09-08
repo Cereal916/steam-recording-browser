@@ -30,6 +30,7 @@ public sealed class RecordingItem : INotifyPropertyChanged
     public IReadOnlyList<DateTime> SessionPlaybackStartTimes { get; init; } = Array.Empty<DateTime>();
     public IReadOnlyList<double> SessionDurationsSeconds { get; init; } = Array.Empty<double>();
     public IReadOnlyList<long> SessionSizesBytes { get; init; } = Array.Empty<long>();
+    public IReadOnlyList<SteamTimelineEvent> TimelineEvents { get; init; } = Array.Empty<SteamTimelineEvent>();
     public string VideoCodec { get; init; } = "Unknown";
     public string AudioCodec { get; init; } = "Unknown";
     public string Resolution { get; init; } = "Unknown";
