@@ -13,7 +13,7 @@ public sealed class MetadataEntry
 
 public sealed class MetadataDocument
 {
-    public int SchemaVersion { get; set; } = 2;
+    public int SchemaVersion { get; set; } = 3;
     public string AppVersion { get; set; } = AppInfo.Version;
     public DateTimeOffset ExportedAt { get; set; } = DateTimeOffset.Now;
     public List<MetadataEntry> Entries { get; set; } = new();

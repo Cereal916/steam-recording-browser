@@ -25,11 +25,20 @@ Discovers Steam library folders and resolves App IDs to installed game names fro
 
 Owns `%LOCALAPPDATA%\SteamRecordingBrowser\library.json`.
 
-Primary identity is the stable recording key derived from the Steam background recording folder:
+Saved clips use their enclosing `clip_<appid>_<yyyyMMdd>_<HHmmss>[_<suffix>]`
+folder as a stable identity, including any numeric suffix. It takes precedence
+over the nested `bg_*` or `fg_*` video session, which multiple independent clips
+can share. Background recordings retain their `bg_<appid>_<yyyyMMdd>_<HHmmss>`
+identity. Unrecognized paths use the original full path as a fallback.
 
-`bg_<appid>_<yyyyMMdd>_<HHmmss>`
-
-The original full path remains a legacy/fallback identity.
+Schema 3 migrates legacy saved-clip entries using their recorded path, without
+requiring recording files to be online. A shared legacy entry belongs only to
+the clip named by that path; overwritten per-clip history cannot be recovered.
+An explicit clip entry takes precedence over a legacy entry for the same clip.
+Loading a store that needs migration first preserves its original bytes in
+`library_before_clip_identity_<timestamp>.json`, then saves the migrated store.
+Imports apply the same identity migration and retain the pre-import safety
+backup and original import file.
 
 ### `DashCompatibilityService`
 

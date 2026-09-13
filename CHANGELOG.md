@@ -21,6 +21,12 @@ The project follows semantic versioning beginning with **1.0.0**.
 - Added isolated WPF UX tests and rendered visual-review images for tag editing.
   Tests run without using the active desktop, mouse, or keyboard.
 
+### Fixed
+
+- Clips from the same play session now keep independent tags, descriptions,
+  and favorites. Existing shared metadata is backed up and migrated to the clip
+  identified by its saved path.
+
 ## 1.7.0 - 2026-09-08
 
 ### Added
