@@ -125,6 +125,9 @@ public sealed class MetadataService
         Save();
     }
 
+    public IReadOnlyList<string> GetKnownTags() =>
+        NormalizeTags(_byKey.Values.SelectMany(entry => entry.Tags));
+
     public void Save()
     {
         var meaningful = _byKey.Values

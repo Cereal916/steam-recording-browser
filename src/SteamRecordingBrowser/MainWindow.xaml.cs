@@ -976,14 +976,11 @@ public partial class MainWindow : Window
         var item = SelectedItem;
         if (item?.SupportsAnnotations != true) return;
 
-        var dialog = new TextEntryDialog(
-            "Edit tags",
-            "Comma-separated tags:",
-            string.Join(", ", item.Tags)) { Owner = this };
+        var dialog = new TagEditorDialog(item.Tags, _metadata.GetKnownTags()) { Owner = this };
 
         if (dialog.ShowDialog() != true) return;
 
-        item.Tags = MetadataService.NormalizeTags(new[] { dialog.Value });
+        item.Tags = MetadataService.NormalizeTags(dialog.Tags);
         _metadata.UpdateFrom(item);
         UpdateTagFilter();
         ApplyFilter();

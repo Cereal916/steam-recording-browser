@@ -38,6 +38,21 @@ public sealed class MetadataServiceTests
     }
 
     [Fact]
+    public void GetKnownTags_UsesAllStoredRecordingsAndReflectsEdits()
+    {
+        var metadata = new MetadataService();
+        var first = metadata.ForRecording(@"C:\tag-test\first\session.mpd");
+        var second = metadata.ForRecording(@"C:\tag-test\second\session.mpd");
+        first.Tags = new List<string> { "Boss", " Funny " };
+        second.Tags = new List<string> { "BOSS", "Action" };
+
+        Assert.Equal(new[] { "Action", "Boss", "Funny" }, metadata.GetKnownTags());
+
+        second.Tags = new List<string> { "New tag" };
+        Assert.Equal(new[] { "Boss", "Funny", "New tag" }, metadata.GetKnownTags());
+    }
+
+    [Fact]
     public void NormalizeTags_SplitsDeduplicatesSortsAndTrims()
     {
         var tags = new[]

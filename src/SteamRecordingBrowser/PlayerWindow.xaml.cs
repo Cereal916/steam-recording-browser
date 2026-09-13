@@ -3102,10 +3102,7 @@ private readonly DispatcherTimer _hoverFramePauseTimer;
         if (!_item.SupportsAnnotations)
             return;
 
-        var dialog = new TextEntryDialog(
-            "Edit tags",
-            "Comma-separated tags:",
-            string.Join(", ", _item.Tags))
+        var dialog = new TagEditorDialog(_item.Tags, _metadata.GetKnownTags())
         {
             Owner = this
         };
@@ -3113,7 +3110,7 @@ private readonly DispatcherTimer _hoverFramePauseTimer;
         if (dialog.ShowDialog() != true)
             return;
 
-        _item.Tags = MetadataService.NormalizeTags(new[] { dialog.Value });
+        _item.Tags = MetadataService.NormalizeTags(dialog.Tags);
         _metadata.UpdateFrom(_item);
         UpdateMetadataDisplay();
     }

@@ -5,13 +5,20 @@
     <IsTestProject>true</IsTestProject>
     <IsPackable>false</IsPackable>
     <EnableWindowsTargeting>true</EnableWindowsTargeting>
+    <UseWPF>true</UseWPF>
   </PropertyGroup>
 
   <ItemGroup>
+    <!-- WPF removes these standard SDK implicit usings; existing service tests use them. -->
+    <Using Include="System.IO" />
+    <Using Include="System.Net.Http" />
     <PackageReference Include="xunit.v3.mtp-v2" />
   </ItemGroup>
 
   <ItemGroup>
     <ProjectReference Include="../../src/SteamRecordingBrowser/SteamRecordingBrowser.csproj" />
+    <Content Include="../../src/SteamRecordingBrowser/App.xaml" Link="TestResources/App.xaml"
+             CopyToOutputDirectory="PreserveNewest" />
+    <None Update="xunit.runner.json" CopyToOutputDirectory="PreserveNewest" />
   </ItemGroup>
 </Project>

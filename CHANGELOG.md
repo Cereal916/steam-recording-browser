@@ -9,6 +9,18 @@ The project follows semantic versioning beginning with **1.0.0**.
 
 ## Unreleased
 
+### Added
+
+- Added a shared tag editor in the library and player with existing-tag
+  autocomplete, keyboard navigation, removable tags, and comma-separated paste.
+  Suggestions appear on focus, filter as you type, reuse existing spelling,
+  and exclude tags already added.
+
+### Development
+
+- Added isolated WPF UX tests and rendered visual-review images for tag editing.
+  Tests run without using the active desktop, mouse, or keyboard.
+
 ## 1.7.0 - 2026-09-08
 
 ### Added

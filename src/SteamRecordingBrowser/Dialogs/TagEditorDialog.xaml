@@ -1,0 +1,124 @@
+<Window x:Class="SteamRecordingBrowser.Dialogs.TagEditorDialog"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        Title="Edit tags" Width="560" SizeToContent="Height"
+        WindowStartupLocation="CenterOwner" ResizeMode="NoResize"
+        Background="#151922" Foreground="#F4F7FB">
+    <Grid Margin="20">
+        <Grid.RowDefinitions>
+            <RowDefinition Height="Auto"/>
+            <RowDefinition Height="Auto"/>
+            <RowDefinition Height="Auto"/>
+            <RowDefinition Height="Auto"/>
+            <RowDefinition Height="Auto"/>
+            <RowDefinition Height="Auto"/>
+        </Grid.RowDefinitions>
+
+        <TextBlock Text="Tags" FontSize="18" FontWeight="SemiBold"/>
+        <TextBlock Grid.Row="1" Margin="0,6,0,14" TextWrapping="Wrap" Foreground="#AEB9CA"
+                   Text="Find an existing tag or add a new one. You can paste multiple tags separated by commas."/>
+
+        <Border Grid.Row="2" Background="#11151C" BorderBrush="#2B3240"
+                BorderThickness="1" CornerRadius="5" Padding="8" Margin="0,0,0,14">
+            <Grid>
+                <TextBlock x:Name="EmptyTagsText" Text="No tags added yet" Foreground="#98A2B3" Margin="4"/>
+                <ScrollViewer MaxHeight="150" VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled">
+                    <ItemsControl x:Name="TagItems" AutomationProperties.Name="Selected tags">
+                        <ItemsControl.ItemsPanel>
+                            <ItemsPanelTemplate><WrapPanel/></ItemsPanelTemplate>
+                        </ItemsControl.ItemsPanel>
+                        <ItemsControl.ItemTemplate>
+                            <DataTemplate>
+                                <Border Background="#20384A" BorderBrush="#36566D" BorderThickness="1"
+                                        CornerRadius="12" Margin="3" Padding="9,3,3,3" MaxWidth="440">
+                                    <Grid>
+                                        <Grid.ColumnDefinitions>
+                                            <ColumnDefinition Width="*"/>
+                                            <ColumnDefinition Width="Auto"/>
+                                        </Grid.ColumnDefinitions>
+                                        <TextBlock Text="{Binding}" TextWrapping="Wrap" Foreground="#BDE5FF"
+                                                   VerticalAlignment="Center" Margin="0,0,6,0"/>
+                                        <Button Grid.Column="1" Content="×" Padding="5,0" MinWidth="24" MinHeight="24"
+                                                Background="Transparent" BorderBrush="Transparent" Click="RemoveTag_Click"
+                                                VerticalAlignment="Center"
+                                                AutomationProperties.Name="{Binding StringFormat='Remove tag {0}'}"
+                                                ToolTip="{Binding StringFormat='Remove tag {0}'}"/>
+                                    </Grid>
+                                </Border>
+                            </DataTemplate>
+                        </ItemsControl.ItemTemplate>
+                    </ItemsControl>
+                </ScrollViewer>
+            </Grid>
+        </Border>
+
+        <Grid Grid.Row="3">
+            <Grid.ColumnDefinitions>
+                <ColumnDefinition Width="*"/>
+                <ColumnDefinition Width="Auto"/>
+            </Grid.ColumnDefinitions>
+            <TextBox x:Name="TagInput" MinHeight="36" Padding="10,7"
+                     Background="#11151C" Foreground="#F4F7FB" CaretBrush="#F4F7FB"
+                     BorderBrush="#3A4353" SelectionBrush="#36566D"
+                     AutomationProperties.Name="Add a tag"
+                     AutomationProperties.HelpText="Existing tags appear when this field is focused. Type to filter them. Use Up and Down to select a suggestion, Enter or Tab to add, and Escape to dismiss suggestions."
+                     TextChanged="TagInput_TextChanged" PreviewKeyDown="TagInput_PreviewKeyDown"
+                     GotKeyboardFocus="TagInput_GotKeyboardFocus" LostKeyboardFocus="TagInput_LostKeyboardFocus"/>
+            <Button x:Name="AddButton" Grid.Column="1" Content="_Add" Width="72" Margin="8,0,0,0"
+                    Click="Add_Click" AutomationProperties.Name="Add typed tag"/>
+            <Popup x:Name="SuggestionsPopup" PlacementTarget="{Binding ElementName=TagInput}"
+                   Placement="Bottom" StaysOpen="False" AllowsTransparency="True" VerticalOffset="3"
+                   Focusable="False">
+                <Border Width="{Binding ActualWidth, ElementName=TagInput}" Padding="4"
+                        Background="#151922" BorderBrush="#4A596E" BorderThickness="1" CornerRadius="5">
+                    <ListBox x:Name="SuggestionsList" MaxHeight="220" BorderThickness="0"
+                             Background="#151922" Foreground="#F4F7FB" Focusable="False"
+                             ScrollViewer.HorizontalScrollBarVisibility="Disabled"
+                             ScrollViewer.VerticalScrollBarVisibility="Auto"
+                             AutomationProperties.Name="Existing tag suggestions"
+                             PreviewMouseLeftButtonDown="SuggestionsList_PreviewMouseLeftButtonDown">
+                        <ListBox.ItemContainerStyle>
+                            <Style TargetType="ListBoxItem">
+                                <Setter Property="Focusable" Value="False"/>
+                                <Setter Property="HorizontalContentAlignment" Value="Stretch"/>
+                                <Setter Property="Padding" Value="10,8"/>
+                                <Setter Property="Template">
+                                    <Setter.Value>
+                                        <ControlTemplate TargetType="ListBoxItem">
+                                            <Border x:Name="ItemBorder" Background="Transparent" CornerRadius="3"
+                                                    Padding="{TemplateBinding Padding}">
+                                                <ContentPresenter/>
+                                            </Border>
+                                            <ControlTemplate.Triggers>
+                                                <Trigger Property="IsMouseOver" Value="True">
+                                                    <Setter TargetName="ItemBorder" Property="Background" Value="#263142"/>
+                                                </Trigger>
+                                                <Trigger Property="IsSelected" Value="True">
+                                                    <Setter TargetName="ItemBorder" Property="Background" Value="#254A63"/>
+                                                    <Setter Property="Foreground" Value="#D7F0FF"/>
+                                                </Trigger>
+                                                <Trigger Property="IsEnabled" Value="False">
+                                                    <Setter Property="Opacity" Value="0.5"/>
+                                                </Trigger>
+                                            </ControlTemplate.Triggers>
+                                        </ControlTemplate>
+                                    </Setter.Value>
+                                </Setter>
+                            </Style>
+                        </ListBox.ItemContainerStyle>
+                        <ListBox.ItemTemplate>
+                            <DataTemplate><TextBlock Text="{Binding}" TextWrapping="Wrap"/></DataTemplate>
+                        </ListBox.ItemTemplate>
+                    </ListBox>
+                </Border>
+            </Popup>
+        </Grid>
+
+        <TextBlock x:Name="StatusText" Grid.Row="4" Margin="0,8,0,0" Foreground="#98A2B3"
+                   TextWrapping="Wrap" AutomationProperties.LiveSetting="Polite"/>
+        <StackPanel Grid.Row="5" Orientation="Horizontal" HorizontalAlignment="Right" Margin="0,20,0,0">
+            <Button Content="_Cancel" Width="90" Margin="0,0,8,0" IsCancel="True"/>
+            <Button Content="_Save" Width="90" IsDefault="True" Click="Save_Click"/>
+        </StackPanel>
+    </Grid>
+</Window>

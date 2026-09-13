@@ -64,8 +64,68 @@ dotnet build SteamRecordingBrowser.sln -c Debug
 Run tests:
 
 ```powershell
-dotnet test tests/SteamRecordingBrowser.Tests/SteamRecordingBrowser.Tests.csproj
+dotnet test --project tests/SteamRecordingBrowser.Tests/SteamRecordingBrowser.Tests.csproj
 ```
+
+## UI and UX testing without taking over the desktop
+
+The existing xUnit suite includes real WPF dialog tests under
+`tests/SteamRecordingBrowser.Tests/Ux/`. Use this harness as the default for UI
+changes. It starts each scenario in a child test process assigned to a private,
+undisplayed Windows desktop before WPF initializes. It never switches the user's
+input desktop or sends global mouse/keyboard input. Isolation failures fail the
+test before a dialog opens; there is no fallback to the interactive desktop.
+
+Run the full suite normally, or run only UX tests after a Release build:
+
+```powershell
+dotnet build SteamRecordingBrowser.sln -c Release
+dotnet tests/SteamRecordingBrowser.Tests/bin/Release/net10.0-windows/SteamRecordingBrowser.Tests.dll -trait Category=UX
+```
+
+The tests exercise actual XAML controls, focus, popup visibility, text changes,
+routed keyboard/mouse events, button automation peers, save/cancel, and layout
+bounds. The tag editor scenarios cover suggestions on initial focus, filtering
+and clearing, keyboard and mouse selection, duplicate prevention, pending text
+on save, empty tags, and long labels with scrolling. Tests use sample data and
+load the application's shared styles without starting Steam scanning or libVLC.
+
+`IsolatedWpfTest.Render` generates PNGs directly from WPF visuals; it does not
+capture the screen. Dialog content and popup content are rendered separately.
+Review these images alongside layout assertions to evaluate appearance. The
+scale cases generate output at 100%, 150%, and 200% rendering resolution; they
+do not change Windows display settings or simulate moving across monitors.
+
+Images and individual child test reports are written to:
+
+```text
+tests/SteamRecordingBrowser.Tests/bin/Release/net10.0-windows/TestResults/ux/
+```
+
+Set `SRB_UX_ARTIFACTS` to an absolute directory to choose another location. Each
+scenario runs on a fresh STA dispatcher with a bounded timeout; child processes
+and their desktops are cleaned up after execution. Keep `preEnumerateTheories`
+enabled in `xunit.runner.json`, so the child runner can select one parameterized
+scenario by its xUnit case ID. UX tests run in the normal Windows CI test step;
+images and child reports are retained as the `ux-test-results` artifact for
+14 days, including on failure.
+
+For new dialogs, use `IsolatedWpfTest.Run`, construct the dialog inside its
+callback, and call `host.ShowDialog(dialog, () => { ... })` to inspect and operate
+loaded controls. Use `Pump()` after asynchronous UI work, `Key()` for routed key
+events, and `Click()` for button invocation. The host closes the dialog even
+when an assertion fails. Verify that Save or Cancel actually closed the dialog
+inside the callback, before the host's cleanup runs.
+
+These tests validate control behavior and rendered layout. They do not replace
+human usability evaluation, real screen-reader testing, physical input/IME
+testing, native title-bar/DPI checks, or libVLC video-composition checks. Perform
+those checks in a separate VM or an explicitly authorized interactive session,
+not on the user's active desktop by default.
+
+Implementation references: [Windows desktops](https://learn.microsoft.com/en-us/windows/win32/winstation/desktops),
+[process desktop assignment](https://learn.microsoft.com/en-us/windows/win32/api/processthreadsapi/ns-processthreadsapi-startupinfow),
+and [WPF visual rendering](https://learn.microsoft.com/en-us/dotnet/api/system.windows.media.imaging.rendertargetbitmap).
 
 ## Release packaging
 

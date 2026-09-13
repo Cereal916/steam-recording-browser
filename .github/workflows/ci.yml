@@ -32,3 +32,12 @@ jobs:
 
       - name: Test
         run: dotnet test --project tests/SteamRecordingBrowser.Tests/SteamRecordingBrowser.Tests.csproj --configuration Release --no-build
+
+      - name: Upload UX images and reports
+        if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: ux-test-results
+          path: tests/SteamRecordingBrowser.Tests/bin/Release/net10.0-windows/TestResults/ux/
+          if-no-files-found: ignore
+          retention-days: 14
