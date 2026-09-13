@@ -395,6 +395,7 @@
         <ListView x:Name="RecordingList" Grid.Column="0"
                   Background="#0D1015" BorderThickness="0"
                   HorizontalContentAlignment="Stretch"
+                  VirtualizingPanel.ScrollUnit="Pixel"
                   ScrollViewer.HorizontalScrollBarVisibility="Disabled"
                   ScrollViewer.VerticalScrollBarVisibility="Auto"
                   MouseDoubleClick="RecordingList_MouseDoubleClick">
@@ -829,6 +830,7 @@
                       CanUserSortColumns="True" CanUserResizeColumns="True" CanUserReorderColumns="True"
                       CanUserAddRows="False" CanUserDeleteRows="False"
                       EnableRowVirtualization="True" EnableColumnVirtualization="True"
+                      VirtualizingPanel.ScrollUnit="Pixel"
                       HeadersVisibility="Column" GridLinesVisibility="None"
                       FrozenColumnCount="0" AlternationCount="2"
                       RowStyle="{StaticResource DarkDataGridRow}"
@@ -1032,7 +1034,7 @@
                             </DataTemplate>
                         </DataGridTemplateColumn.CellTemplate>
                     </DataGridTemplateColumn>
-                    <DataGridTextColumn Header="Recorded" Binding="{Binding Timestamp, StringFormat={}{0:MMM d, yyyy h:mm tt}}"
+                    <DataGridTextColumn Header="Recorded" Binding="{Binding Timestamp, StringFormat='{}{0:MMM d, yyyy h:mm tt}'}"
                                         SortMemberPath="Timestamp" Width="158" ElementStyle="{StaticResource TableText}"/>
                     <DataGridTextColumn Header="Duration" Binding="{Binding DurationText}" SortMemberPath="DurationSeconds" Width="86"
                                         ElementStyle="{StaticResource TableNumericText}"/>

@@ -19,6 +19,8 @@
     <ProjectReference Include="../../src/SteamRecordingBrowser/SteamRecordingBrowser.csproj" />
     <Content Include="../../src/SteamRecordingBrowser/App.xaml" Link="TestResources/App.xaml"
              CopyToOutputDirectory="PreserveNewest" />
+    <Content Include="../../src/SteamRecordingBrowser/MainWindow.xaml" Link="TestResources/MainWindow.xaml"
+             CopyToOutputDirectory="PreserveNewest" />
     <None Update="xunit.runner.json" CopyToOutputDirectory="PreserveNewest" />
   </ItemGroup>
 </Project>

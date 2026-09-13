@@ -90,6 +90,11 @@ and clearing, keyboard and mouse selection, duplicate prevention, pending text
 on save, empty tags, and long labels with scrolling. Tests use sample data and
 load the application's shared styles without starting Steam scanning or libVLC.
 
+Clip scrolling scenarios load the main window's actual list, tile, and table
+XAML with sample recordings and application service handlers removed. They
+check wheel movement, partial-card scrolling, virtualization, paging, horizontal
+table scrolling, and top/bottom limits at normal and minimum window sizes.
+
 `IsolatedWpfTest.Render` generates PNGs directly from WPF visuals; it does not
 capture the screen. Dialog content and popup content are rendered separately.
 Review these images alongside layout assertions to evaluate appearance. The

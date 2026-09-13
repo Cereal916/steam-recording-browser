@@ -23,6 +23,8 @@ The project follows semantic versioning beginning with **1.0.0**.
 
 ### Fixed
 
+- The main clip list and table now scroll in small pixel increments instead of
+  jumping several full cards or rows with each mouse-wheel tick.
 - Clips from the same play session now keep independent tags, descriptions,
   and favorites. Existing shared metadata is backed up and migrated to the clip
   identified by its saved path.
