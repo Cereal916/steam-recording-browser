@@ -59,7 +59,8 @@ if (-not (Test-Path $nuget)) {
     throw "NuGet.Config is missing: $nuget"
 }
 
-& $dotnet.Source restore $Project --configfile $nuget
+# Match the publish settings so a clean SDK/cache also restores the runtime packs.
+& $dotnet.Source restore $Project --configfile $nuget -r win-x64 -p:SelfContained=true
 if ($LASTEXITCODE -ne 0) { throw "dotnet restore failed: $LASTEXITCODE" }
 
 & $dotnet.Source publish $Project `

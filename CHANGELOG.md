@@ -9,17 +9,14 @@ The project follows semantic versioning beginning with **1.0.0**.
 
 ## Unreleased
 
+## 1.8.0 - 2026-09-13
+
 ### Added
 
 - Added a shared tag editor in the library and player with existing-tag
   autocomplete, keyboard navigation, removable tags, and comma-separated paste.
   Suggestions appear on focus, filter as you type, reuse existing spelling,
   and exclude tags already added.
-
-### Development
-
-- Added isolated WPF UX tests and rendered visual-review images for tag editing.
-  Tests run without using the active desktop, mouse, or keyboard.
 
 ### Fixed
 
@@ -28,6 +25,14 @@ The project follows semantic versioning beginning with **1.0.0**.
 - Clips from the same play session now keep independent tags, descriptions,
   and favorites. Existing shared metadata is backed up and migrated to the clip
   identified by its saved path.
+
+### Development
+
+- Added isolated WPF UX tests and rendered visual-review images for tag editing
+  and clip scrolling. Tests run without using the active desktop, mouse, or
+  keyboard and are included in Windows CI.
+- Release packaging now explicitly restores the Windows runtime packs needed
+  for self-contained portable builds.
 
 ## 1.7.0 - 2026-09-08
 
