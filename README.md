@@ -5,7 +5,9 @@ organizing, playing, and exporting clips created by Steam Game Recording.
 
 See the [changelog](CHANGELOG.md) for the current release and version history.
 
-![Steam Recording Browser library](https://github.com/user-attachments/assets/6866bbac-4ec6-472a-b578-8783e908626a)
+<img width="882" height="616" alt="2026-09-14 00_43_59-Steam Recording Browser" src="https://github.com/user-attachments/assets/758229e9-6cc4-41a2-ae6d-bcf4381e470f" />
+<img width="923" height="611" alt="image" src="https://github.com/user-attachments/assets/c653f021-3d1b-49a8-ade8-8faedfa601ba" />
+<img width="923" height="610" alt="image" src="https://github.com/user-attachments/assets/4c4513ca-10a8-4449-8788-4f18b4688632" />
 
 ## Download and install
 
