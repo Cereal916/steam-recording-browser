@@ -97,8 +97,12 @@ table scrolling, and top/bottom limits at normal and minimum window sizes.
 
 Player sizing scenarios load the actual player XAML with a 16:9 placeholder
 instead of libVLC. They check opening sizes with optional panels, wrapping
-descriptions and tags, and smaller monitor work areas. Native playback and
-physical monitor/DPI transitions still require separate manual verification.
+descriptions and tags, and smaller monitor work areas. A per-window
+`WM_GETMINMAXINFO` hook supplies simulated native size limits so Windows does
+not cap these layouts to the CI host's screen resolution. The hook runs only
+on the private test desktop and does not change system display settings.
+Native playback and physical monitor/DPI transitions still require separate
+manual verification.
 
 `IsolatedWpfTest.Render` generates PNGs directly from WPF visuals; it does not
 capture the screen. Dialog content and popup content are rendered separately.

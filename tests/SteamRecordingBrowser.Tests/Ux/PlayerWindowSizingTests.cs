@@ -20,6 +20,7 @@ public sealed class PlayerWindowSizingTests
         bool annotations, bool events, double scale) => Run(host =>
     {
         var window = LoadPlayer(annotations, events);
+        using var sizeLimits = new WindowSizeLimits(window, new Size(1920, 1200));
         var video = Find<Grid>(window, "VideoArea");
         var workArea = new Rect(0, 0, 1920, 1200);
         window.Loaded += (_, _) => PlayerWindowSizing.FitToVideo(window, video, workArea);
@@ -46,6 +47,7 @@ public sealed class PlayerWindowSizingTests
         double width, double height, bool annotations, bool events) => Run(host =>
     {
         var window = LoadPlayer(annotations, events);
+        using var sizeLimits = new WindowSizeLimits(window, new Size(1920, 1200));
         var video = Find<Grid>(window, "VideoArea");
         // Include a negative monitor origin and a taskbar offset.
         var workArea = new Rect(-width, 30, width, height);

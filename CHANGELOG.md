@@ -9,6 +9,11 @@ The project follows semantic versioning beginning with **1.0.0**.
 
 ## Unreleased
 
+### Development
+
+- Player layout tests now use simulated native window limits so they also run
+  on CI machines with smaller screen resolutions.
+
 ## 1.8.1 - 2026-09-14
 
 ### Fixed
