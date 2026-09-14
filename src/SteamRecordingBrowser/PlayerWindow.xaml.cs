@@ -13,6 +13,7 @@ using LibVLCSharp.Shared;
 using SteamRecordingBrowser.Services;
 using SteamRecordingBrowser.Models;
 using SteamRecordingBrowser.Dialogs;
+using SteamRecordingBrowser.Utilities;
 
 namespace SteamRecordingBrowser;
 
@@ -277,6 +278,7 @@ private readonly DispatcherTimer _hoverFramePauseTimer;
 
         Loaded += (_, _) =>
         {
+            PlayerWindowSizing.FitToVideo(this, VideoArea);
             AttachNativeInputHook();
             ConfigureNativeVideoHost(VideoView);
 

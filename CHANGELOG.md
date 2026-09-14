@@ -9,6 +9,12 @@ The project follows semantic versioning beginning with **1.0.0**.
 
 ## Unreleased
 
+### Fixed
+
+- The player now opens tall enough for a 16:9 video to fill its width above
+  the controls and visible metadata panels, reducing the window width when
+  needed to fit the monitor's usable area.
+
 ## 1.8.0 - 2026-09-13
 
 ### Added

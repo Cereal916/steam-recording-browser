@@ -21,6 +21,8 @@
              CopyToOutputDirectory="PreserveNewest" />
     <Content Include="../../src/SteamRecordingBrowser/MainWindow.xaml" Link="TestResources/MainWindow.xaml"
              CopyToOutputDirectory="PreserveNewest" />
+    <Content Include="../../src/SteamRecordingBrowser/PlayerWindow.xaml" Link="TestResources/PlayerWindow.xaml"
+             CopyToOutputDirectory="PreserveNewest" />
     <None Update="xunit.runner.json" CopyToOutputDirectory="PreserveNewest" />
   </ItemGroup>
 </Project>

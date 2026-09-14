@@ -25,6 +25,7 @@
   </PropertyGroup>
 
   <ItemGroup>
+    <InternalsVisibleTo Include="SteamRecordingBrowser.Tests" />
     <PackageReference Include="LibVLCSharp.WPF" />
     <PackageReference Include="VideoLAN.LibVLC.Windows" />
   </ItemGroup>

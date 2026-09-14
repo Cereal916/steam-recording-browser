@@ -359,7 +359,7 @@
             <RowDefinition Height="Auto"/>
         </Grid.RowDefinitions>
 
-        <Grid Grid.Row="0" Background="#000000">
+        <Grid x:Name="VideoArea" Grid.Row="0" Background="#000000">
             <vlc:VideoView x:Name="VideoView"
                            Focusable="False"
                            Background="#000000">
