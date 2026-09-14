@@ -9,6 +9,8 @@ The project follows semantic versioning beginning with **1.0.0**.
 
 ## Unreleased
 
+## 1.8.1 - 2026-09-14
+
 ### Fixed
 
 - The player now opens tall enough for a 16:9 video to fill its width above
